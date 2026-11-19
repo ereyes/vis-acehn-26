@@ -1,0 +1,2617 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title data-i18n="">Photo EXIF Editor</title>
+  <style>
+    :root {
+      font: 100%/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #192b26;
+      background: #edf1ed;
+      --surface: #fbfcfa;
+      --muted: #52625c;
+      --line: #d5dfd8;
+      --green: #195943;
+      --green-hover: #124735;
+      --focus: #248364;
+      --error: #9b2f24;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(100% - 3rem, 70rem); margin: auto; padding: 3.75rem 0 3rem; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(2.25rem, 6vw, 4rem); font-weight: 730; line-height: 1.05; letter-spacing: -.059em; }
+    h2 { font-size: 1.375rem; font-weight: 690; line-height: 1.2; letter-spacing: -.032em; }
+    .intro { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1.15rem 1.5rem; }
+    .intro-copy p { color: var(--muted); margin-top: .85rem; max-width: 42rem; }
+    .page-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem; }
+    .language-toggle {
+      display: inline-flex;
+      padding: .17rem;
+      border: 1px solid var(--line);
+      border-radius: .65rem;
+      background: var(--surface);
+    }
+    .language-toggle button {
+      min-width: 2.44rem;
+      min-height: 2.2rem;
+      padding: .3rem .5rem;
+      border-radius: .44rem;
+      background: transparent;
+      color: var(--green);
+    }
+    .language-toggle button:hover { background: #e5f2e7; }
+    .language-toggle button[aria-pressed="true"] { background: var(--green); color: white; }
+    .html-status { margin-top: .35rem; color: var(--muted); font-size: .85rem; }
+    .html-status:empty { display: none; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 0.83fr) minmax(0, 1fr); gap: 1.3rem; margin-top: 2rem; align-items: start; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: 1.25rem; padding: 1.4rem; background: var(--surface); box-shadow: 0 5px 16px #20362808; }
+    .panel-head { margin-bottom: 1.05rem; min-height: 1.65rem; }
+    .dropzone {
+      min-height: 19rem;
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid #244638;
+      border-radius: .85rem;
+      background: #19372c;
+      color: #f5fff8;
+      isolation: isolate;
+    }
+    .dropzone::after {
+      content: "";
+      position: absolute;
+      inset: .65rem;
+      border: 1px dashed #8ab39a70;
+      border-radius: .48rem;
+      pointer-events: none;
+    }
+    .dropzone.has-image::after { visibility: hidden; }
+    .dropzone.is-dragging::after { visibility: visible; border: 2px dashed #b3ffce; }
+    .dropzone.is-dragging { background-color: #285541; }
+    .dropzone.is-dragging img { opacity: .48; }
+    .empty-state { text-align: center; padding: 2rem 1rem; }
+    .drop-icon {
+      display: block;
+      position: relative;
+      width: 2.85rem;
+      height: 2.85rem;
+      margin: 0 auto .8rem;
+      border-radius: .7rem;
+      background: #ffffff13;
+    }
+    .drop-icon::before {
+      position: absolute;
+      content: "";
+      inset: .75rem .65rem .64rem;
+      border: 1.5px solid #c3edcf;
+      border-radius: .2rem;
+    }
+    .drop-icon::after {
+      position: absolute;
+      content: "";
+      width: .72rem;
+      height: .63rem;
+      top: 1.27rem;
+      left: 1.08rem;
+      border: solid #c3edcf;
+      border-width: 1.5px 0 0 1.5px;
+      transform: rotate(45deg);
+      border-radius: .1rem 0 0;
+    }
+    .drop-title { font-size: 1.18rem; font-weight: 660; letter-spacing: -.025em; }
+    .drop-formats { color: #c3d7ca; font-size: .875rem; margin: .2rem 0 1.15rem; }
+    .dropzone img { display: block; width: 100%; height: 19rem; object-fit: contain; }
+    .source-info { margin-top: .9rem; display: flex; gap: .8rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .file-summary { min-width: 0; flex: 1 1 10rem; }
+    .file-name { font-weight: 650; overflow-wrap: anywhere; }
+    .file-details, .privacy { color: var(--muted); font-size: .85rem; }
+    .photo-status { color: var(--muted); margin-top: .85rem; font-size: .875rem; overflow-wrap: anywhere; }
+    .photo-status:empty { display: none; }
+    .privacy { margin-top: .95rem; }
+    .status, .hint, .export-status { color: var(--muted); font-size: .9rem; }
+    .status { margin-top: .42rem; }
+    fieldset { padding: 0; margin: 0; min-width: 0; border: 0; }
+    fieldset + fieldset { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .95rem; }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .78rem .8rem; }
+    .bearing-fields { display: grid; grid-template-columns: 1fr 1.17fr 1.08fr; gap: .8rem; margin-top: .78rem; }
+    .field { display: block; min-width: 0; font-size: .875rem; font-weight: 630; }
+    .field > span { display: block; margin-bottom: .3rem; }
+    .field small { color: var(--muted); font: inherit; font-weight: 450; }
+    input, select, button { font: inherit; }
+    input:not([type="file"]), select {
+      width: 100%;
+      min-width: 0;
+      height: 2.7rem;
+      padding: .48rem .62rem;
+      border: 1px solid #bccbc1;
+      border-radius: .5rem;
+      background-color: #fff;
+      color: #192b26;
+      font-weight: 450;
+    }
+    input[type="number"] { appearance: textfield; font-variant-numeric: tabular-nums; }
+    input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance: none; }
+    select {
+      appearance: none;
+      padding-right: 1.5rem;
+      background-image: linear-gradient(45deg, transparent 50%, #54675c 50%), linear-gradient(135deg, #54675c 50%, transparent 50%);
+      background-position: right .79rem center, right .54rem center;
+      background-size: .26rem .28rem;
+      background-repeat: no-repeat;
+    }
+    input::placeholder { color: #647269; opacity: 1; }
+    input:disabled, select:disabled { background-color: #eef3ef; opacity: 1; color: #5c6e62; }
+    button {
+      flex-shrink: 0;
+      border: 1px solid transparent;
+      border-radius: .55rem;
+      padding: .55rem .9rem;
+      min-height: 2.65rem;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 660;
+      line-height: 1.25;
+    }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .choose { color: #19372c; background: #eff9ee; }
+    .choose:hover { background: #d9f3dc; }
+    .choose:focus-visible { outline-color: #c3edcf; }
+    .choose-other { color: var(--green); border-color: #bbd2c3; background-color: #f1f7f1; }
+    .choose-other:hover { background-color: #e5f2e7; }
+    .download { background-color: var(--green); color: #fff; }
+    .download:enabled:hover { background-color: var(--green-hover); }
+    .download:disabled { background-color: #e4ece5; color: #617163; cursor: default; }
+    .form-footer { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem 1rem; margin-top: 1.15rem; }
+    .hint { margin-top: .75rem; }
+    .hint:empty, .export-status:empty { display: none; }
+    .location-assist { margin-top: .75rem; }
+    .model-custom { margin-top: .6rem; }
+    .compass-tool {
+      margin-top: .8rem;
+      border: 1px solid var(--line);
+      border-radius: .65rem;
+      background: #f3f7f3;
+    }
+    .compass-tool summary {
+      padding: .62rem .8rem;
+      color: var(--green);
+      cursor: pointer;
+      font-size: .91rem;
+      font-weight: 660;
+    }
+    .compass-tool summary:focus-visible, .compass-dial:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 3px;
+    }
+    .compass-body { display: flex; align-items: center; gap: 1.25rem; padding: .55rem .85rem 1rem; }
+    .compass-dial {
+      position: relative;
+      flex: 0 0 auto;
+      width: 11.5rem;
+      aspect-ratio: 1;
+      border: 1px solid #aac4b5;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fefffe 46%, #f0f8f2 47%, #f8fcf8 70%);
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      --heading: 0deg;
+    }
+    .compass-dial:active { cursor: grabbing; }
+    .compass-dial[aria-disabled="true"] { opacity: .65; cursor: default; }
+    .compass-dial::before {
+      content: "";
+      position: absolute;
+      inset: .5rem;
+      border-radius: 50%;
+      background: repeating-conic-gradient(from -.6deg, #799987 0deg 1.2deg, transparent 1.2deg 15deg);
+      mask-image: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    }
+    .compass-dial > * { pointer-events: none; }
+    .compass-mark {
+      position: absolute;
+      z-index: 1;
+      color: #3f6455;
+      font-size: .79rem;
+      font-weight: 730;
+      line-height: 1;
+    }
+    .compass-mark.north { top: 1.12rem; left: 50%; transform: translateX(-50%); color: #145840; }
+    .compass-mark.east { top: 50%; right: 1.04rem; transform: translateY(-50%); }
+    .compass-mark.south { bottom: 1.12rem; left: 50%; transform: translateX(-50%); }
+    .compass-mark.west { top: 50%; left: 1.04rem; transform: translateY(-50%); }
+    .compass-rotor { position: absolute; inset: 0; transform: rotate(var(--heading)); }
+    .compass-dial[data-set="false"] .compass-rotor { opacity: .58; }
+    .compass-beam {
+      position: absolute;
+      inset: 20% 23% 49%;
+      background: linear-gradient(180deg, #96e5b5a8, #3f9d6e3d);
+      clip-path: polygon(50% 100%, 7% 14%, 23% 5%, 50% 0, 77% 5%, 93% 14%);
+    }
+    .compass-camera {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2.7rem;
+      height: 1.38rem;
+      border: 1px solid #123d2e;
+      border-radius: .32rem .32rem .36rem .36rem;
+      transform: translate(-50%, -35%);
+      background: linear-gradient(180deg, #427d64 0 28%, #214c3c 28% 72%, #193a30 72%);
+      box-shadow: 0 2px 3px #16382b40;
+    }
+    .compass-camera::before {
+      content: "";
+      position: absolute;
+      bottom: 89%;
+      left: 50%;
+      width: 1.14rem;
+      height: .82rem;
+      transform: translateX(-50%);
+      border: 1px solid #184734;
+      border-radius: .22rem .22rem .08rem .08rem;
+      background: linear-gradient(180deg, #91c8aa 0 20%, #204f3d 20% 45%, #438066 45% 56%, #2a604d 56%);
+    }
+    .compass-camera::after {
+      content: "";
+      position: absolute;
+      top: .22rem;
+      right: .23rem;
+      width: .29rem;
+      height: .29rem;
+      border-radius: 50%;
+      background: #d3ebd8;
+    }
+    .compass-copy { min-width: 0; }
+    .compass-reading { color: #194f3b; font-size: 1.42rem; line-height: 1.2; font-weight: 720; font-variant-numeric: tabular-nums; }
+    .compass-reference { font-size: .87rem; color: var(--muted); margin-top: .25rem; }
+    .compass-instructions { font-size: .87rem; color: var(--muted); margin-top: .6rem; }
+    #guide-fields { border-top: 0; padding-top: 0; }
+    .guide { border: 1px solid var(--line); border-radius: .65rem; background: #f3f7f3; }
+    .guide summary { cursor: pointer; padding: .7rem .8rem; color: var(--green); font-size: .91rem; font-weight: 660; }
+    .guide summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: .55rem; }
+    .guide-content { padding: 0 .8rem .8rem; }
+    .guide-row { padding: .7rem 0; border-top: 1px solid var(--line); }
+    .guide-row:last-child { padding-bottom: 0; }
+    .guide-row h3 { margin: 0 0 .18rem; font-size: .875rem; }
+    .guide-row button { margin-top: .5rem; }
+    .utility:disabled { cursor: default; opacity: .68; }
+    .guide-copy, .locator-help { color: var(--muted); font-size: .875rem; }
+    .guide-result { margin-top: .45rem; }
+    #position-required { margin: 0 0 .7rem; }
+    .guide-result:empty, .locator-status:empty { display: none; }
+    .guide-controls { display: flex; gap: .4rem .55rem; flex-wrap: wrap; }
+    dialog {
+      width: min(100% - 2rem, 48rem);
+      max-height: calc(100% - 2rem);
+      padding: clamp(1rem, 4vw, 1.45rem);
+      color: inherit;
+      background: var(--surface);
+      border: 1px solid #b9cbbf;
+      border-radius: 1rem;
+      box-shadow: 0 16px 60px #19372c38;
+    }
+    dialog::backdrop { background: #142c24a8; }
+    .locator-head { display: flex; justify-content: space-between; gap: .8rem; align-items: center; margin-bottom: .55rem; }
+    .locator-intro { margin-bottom: .9rem; }
+    .locator-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .75rem; }
+    .locator-help { margin-top: .45rem; }
+    .locator-status { margin-top: .6rem; }
+    .map-region { margin-top: .85rem; }
+    .map-region a { color: var(--green); }
+    .map-region iframe {
+      display: block;
+      width: 100%;
+      height: clamp(19rem, 45vh, 29rem);
+      border: 1px solid var(--line);
+      background: #ecf3ee;
+      border-radius: .6rem;
+    }
+    [data-error="true"] { color: var(--error); }
+    [hidden] { display: none !important; }
+    @media (max-width: 56rem) {
+      main { padding-top: 2.75rem; }
+      .workspace { grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); gap: .85rem; }
+      .panel { padding: 1rem; }
+      .bearing-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .bearing-fields .reference { grid-column: 1 / -1; }
+    }
+    @media (max-width: 46rem) {
+      main { width: min(100% - 2rem, 36rem); padding-top: 2rem; }
+      .workspace { grid-template-columns: minmax(0, 1fr); margin-top: 1.4rem; }
+      .dropzone { min-height: 14rem; }
+      .dropzone img { height: min(55vw, 19rem); min-height: 14rem; }
+    }
+    @media (max-width: 28rem) {
+      .capture-fields { grid-template-columns: minmax(0, 1fr); }
+      .compass-body { flex-direction: column; gap: .65rem; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="intro">
+      <div class="intro-copy">
+        <h1 data-i18n="">Photo EXIF Editor</h1>
+        <p data-i18n="">Read and edit a photo’s embedded metadata, then save it as a new JPG.</p>
+      </div>
+      <div>
+        <div class="page-actions">
+          <div class="language-toggle" role="group" aria-label="Language" data-i18n-aria="">
+            <button type="button" id="language-en" lang="en" aria-label="English" aria-pressed="true">EN</button>
+            <button type="button" id="language-fr" lang="fr" aria-label="Français" aria-pressed="false">FR</button>
+          </div>
+          <button class="choose-other" id="download-html" type="button" data-i18n="">Download HTML</button>
+        </div>
+        <p class="html-status" id="html-status" role="status"></p>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <section class="panel" aria-labelledby="photo-heading" id="photo-panel">
+        <header class="panel-head"><h2 id="photo-heading" data-i18n="">Photo</h2></header>
+        <input type="file" id="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden="">
+        <div class="dropzone" id="dropzone">
+          <div class="empty-state" id="empty-state">
+            <span class="drop-icon" aria-hidden="true"></span>
+            <p class="drop-title" data-i18n="">Drop a photo here</p>
+            <p class="drop-formats" data-i18n="">JPG or PNG</p>
+            <button class="choose" id="choose" type="button" data-i18n="">Choose image</button>
+          </div>
+          <img id="preview" alt="Selected photo preview" data-i18n-alt="" draggable="false" hidden="">
+        </div>
+        <div class="source-info" id="source-info" hidden="">
+          <div class="file-summary">
+            <p class="file-name" id="file-name"></p>
+            <p class="file-details" id="file-details"></p>
+          </div>
+          <button class="choose-other" id="choose-other" type="button" data-i18n="">Choose another image</button>
+        </div>
+        <p class="photo-status" id="photo-status" role="status"></p>
+        <p class="privacy" data-i18n="">Photos stay on this device. Map and elevation lookups use the internet.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="metadata-heading">
+        <header class="panel-head">
+          <h2 id="metadata-heading" data-i18n="">EXIF metadata</h2>
+          <p class="status" id="metadata-status" role="status">Choose a photo to see its saved values.</p>
+        </header>
+        <form id="editor" novalidate="" autocomplete="off">
+          <fieldset id="gps-fields" aria-label="Location and camera direction" data-i18n-aria="" disabled="">
+            <div class="fields">
+              <label class="field">
+                <span>Latitude <small>(°)</small></span>
+                <input id="latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="—">
+              </label>
+              <label class="field">
+                <span>Longitude <small>(°)</small></span>
+                <input id="longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="—">
+              </label>
+            </div>
+            <div class="location-assist" id="location-assist" hidden="">
+              <button class="choose-other utility" id="find-location" type="button" data-i18n="">Find on map or paste coordinates</button>
+            </div>
+            <div class="bearing-fields">
+              <label class="field">
+                <span>Altitude <small>(m)</small></span>
+                <input id="altitude" type="number" step="any" inputmode="decimal" placeholder="—">
+              </label>
+              <label class="field">
+                <span><span data-i18n="">Camera direction</span> <small>(°)</small></span>
+                <input id="direction" type="number" min="0" step="any" inputmode="decimal" placeholder="—">
+              </label>
+              <label class="field reference">
+                <span data-i18n="">Direction reference</span>
+                <select id="directionRef" disabled="">
+                  <option value="" disabled="" selected="" data-i18n="">Unspecified</option>
+                  <option value="T" data-i18n="">True north</option>
+                  <option value="M" data-i18n="">Magnetic north</option>
+                </select>
+              </label>
+            </div>
+            <details class="compass-tool" id="compass-tool" hidden="">
+              <summary data-i18n="">Aim the camera on a compass</summary>
+              <div class="compass-body">
+                <div class="compass-dial" id="compass-dial" role="slider" tabindex="-1" aria-disabled="true" aria-label="Camera compass" data-i18n-aria="" aria-valuemin="0" aria-valuemax="360" aria-valuenow="0" aria-describedby="compass-instructions compass-keys">
+                  <span class="compass-mark north" aria-hidden="true">N</span>
+                  <span class="compass-mark east" aria-hidden="true">E</span>
+                  <span class="compass-mark south" aria-hidden="true">S</span>
+                  <span class="compass-mark west" aria-hidden="true" data-i18n="">W</span>
+                  <div class="compass-rotor" aria-hidden="true">
+                    <span class="compass-beam"></span>
+                    <span class="compass-camera"></span>
+                  </div>
+                </div>
+                <div class="compass-copy">
+                  <p class="compass-reading" id="compass-reading">Direction unset</p>
+                  <p class="compass-reference" id="compass-reference"></p>
+                  <p class="compass-instructions" id="compass-instructions" data-i18n="">Drag the camera or tap a direction.</p>
+                  <p class="compass-reference" id="compass-keys" data-i18n="">Arrow keys turn 1°. Hold Shift to turn 15°.</p>
+                </div>
+              </div>
+            </details>
+          </fieldset>
+          <fieldset id="capture-fields" aria-label="Capture details" data-i18n-aria="" disabled="">
+            <div class="fields capture-fields">
+              <label class="field">
+                <span data-i18n="">Capture date and time</span>
+                <input id="date" type="datetime-local" min="0001-01-01T00:00" max="9999-12-31T23:59:59" step="1">
+              </label>
+              <div>
+                <label class="field">
+                  <span data-i18n="">Camera model</span>
+                  <select id="model-preset">
+                    <option value="" selected="" data-i18n="">Unspecified</option>
+                    <option value="__custom__" data-i18n="">Enter a custom model…</option>
+                    <optgroup label="Apple iPhone">
+                      <option>iPhone 11</option>
+                      <option>iPhone 12</option>
+                      <option>iPhone 13</option>
+                      <option>iPhone 13 Pro</option>
+                      <option>iPhone 14</option>
+                      <option>iPhone 14 Pro</option>
+                      <option>iPhone 15</option>
+                      <option>iPhone 15 Pro</option>
+                      <option>iPhone 15 Pro Max</option>
+                      <option>iPhone 16</option>
+                      <option>iPhone 16 Pro</option>
+                      <option>iPhone 16 Pro Max</option>
+                      <option>iPhone 17</option>
+                      <option>iPhone 17 Pro</option>
+                    </optgroup>
+                    <optgroup label="Google Pixel">
+                      <option>Pixel 7</option>
+                      <option>Pixel 8</option>
+                      <option>Pixel 8 Pro</option>
+                      <option>Pixel 9</option>
+                      <option>Pixel 9 Pro</option>
+                      <option>Pixel 9a</option>
+                      <option>Pixel 10</option>
+                      <option>Pixel 10 Pro</option>
+                    </optgroup>
+                    <optgroup label="Samsung Galaxy">
+                      <option value="Samsung Galaxy A55 5G">Galaxy A55 5G</option>
+                      <option value="Samsung Galaxy S23 Ultra">Galaxy S23 Ultra</option>
+                      <option value="Samsung Galaxy S24">Galaxy S24</option>
+                      <option value="Samsung Galaxy S24 Ultra">Galaxy S24 Ultra</option>
+                      <option value="Samsung Galaxy S25">Galaxy S25</option>
+                      <option value="Samsung Galaxy S25 Ultra">Galaxy S25 Ultra</option>
+                      <option value="Samsung Galaxy S26 Ultra">Galaxy S26 Ultra</option>
+                    </optgroup>
+                    <optgroup label="Canon">
+                      <option value="Canon EOS R50">EOS R50</option>
+                      <option value="Canon EOS R6 Mark II">EOS R6 Mark II</option>
+                      <option value="Canon EOS R5 Mark II">EOS R5 Mark II</option>
+                    </optgroup>
+                    <optgroup label="Fujifilm">
+                      <option value="Fujifilm X-T5">X-T5</option>
+                      <option value="Fujifilm X-S20">X-S20</option>
+                      <option value="Fujifilm X100VI">X100VI</option>
+                    </optgroup>
+                    <optgroup label="Nikon">
+                      <option value="Nikon Z 8">Z 8</option>
+                      <option value="Nikon Z6III">Z6III</option>
+                    </optgroup>
+                    <optgroup label="Sony">
+                      <option value="Sony Alpha 7 IV">Alpha 7 IV</option>
+                      <option value="Sony Alpha 6700">Alpha 6700</option>
+                      <option value="Sony RX100 VII">RX100 VII</option>
+                    </optgroup>
+                  </select>
+                </label>
+                <label class="field model-custom" id="model-custom" hidden="">
+                  <span data-i18n="">Custom camera model</span>
+                  <input id="model" type="text" placeholder="—">
+                </label>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset id="guide-fields" disabled="" hidden="">
+            <details class="guide" id="metadata-guide">
+              <summary data-i18n="">Help filling in other fields</summary>
+              <div class="guide-content">
+                <p class="guide-copy" id="position-required" data-i18n="">Set the photo location to enable the direction and elevation tools.</p>
+                <div class="guide-row">
+                  <h3 data-i18n="">Camera direction</h3>
+                  <p class="guide-copy" data-i18n="">Choose a landmark the camera was pointing toward. The editor calculates the bearing from the photo location.</p>
+                  <button class="choose-other utility" id="find-bearing" type="button" data-i18n="">Set direction from a landmark</button>
+                </div>
+                <div class="guide-row">
+                  <h3 data-i18n="">Altitude</h3>
+                  <p class="guide-copy" data-i18n="">Look up ground elevation at the photo location with Open-Elevation. Adjust for height above the ground if you know it.</p>
+                  <div class="guide-controls">
+                    <button class="choose-other utility" id="find-elevation" type="button" data-i18n="">Look up ground elevation</button>
+                    <button class="choose-other utility" id="apply-elevation" type="button" hidden="" data-i18n="">Use estimate</button>
+                  </div>
+                  <p class="guide-copy guide-result" id="elevation-status" role="status"></p>
+                </div>
+                <div class="guide-row">
+                  <h3 data-i18n="">Capture date and time</h3>
+                  <p class="guide-copy" data-i18n="">Use the file’s modified time if it matches when you took the photo. Copying or editing a file can change this time.</p>
+                  <button class="choose-other utility" id="use-file-time" type="button" data-i18n="">Use file modified time</button>
+                  <p class="guide-copy guide-result" id="file-time-status" role="status"></p>
+                </div>
+                <div class="guide-row">
+                  <h3 data-i18n="">Camera model</h3>
+                  <p class="guide-copy" data-i18n="">Check the phone’s About screen or read the model from another photo taken with the same camera.</p>
+                  <button class="choose-other utility" id="choose-reference-photo" type="button" data-i18n="">Copy model from another photo</button>
+                  <input type="file" id="reference-photo" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden="">
+                  <p class="guide-copy guide-result" id="reference-status" role="status"></p>
+                </div>
+              </div>
+            </details>
+          </fieldset>
+          <p class="hint" id="edit-hint"></p>
+          <div class="form-footer">
+            <button class="download" id="download" type="submit" disabled="">Download JPG</button>
+            <p class="export-status" id="export-status" role="status"></p>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+  <dialog id="location-dialog" aria-labelledby="locator-heading">
+    <div class="locator-head">
+      <h2 id="locator-heading">Find the photo location</h2>
+      <button class="choose-other" id="close-locator" type="button" data-i18n="">Close</button>
+    </div>
+    <p class="locator-intro" id="locator-intro"></p>
+    <form id="location-entry" novalidate="">
+      <label class="field">
+        <span data-i18n="">Coordinates or map link</span>
+        <input id="location-text" type="text" placeholder="48.8566, 2.3522" data-i18n-placeholder="" autocapitalize="off" spellcheck="false" aria-describedby="locator-help">
+      </label>
+      <p class="locator-help" id="locator-help" data-i18n="">Paste latitude and longitude or a full Google Maps or OpenStreetMap link containing coordinates.</p>
+      <div class="locator-actions">
+        <button class="download" id="apply-location" type="submit">Set photo location</button>
+        <button class="choose-other" id="toggle-map" type="button" aria-controls="map-region" aria-expanded="false">Open online map</button>
+      </div>
+      <p class="locator-help locator-status" id="locator-status" role="status"></p>
+    </form>
+    <div class="map-region" id="map-region" hidden="">
+      <iframe id="location-map" title="Map to choose a point" data-i18n-title="" sandbox="allow-scripts"></iframe>
+      <p class="locator-help locator-status" id="map-status" role="status"></p>
+      <p class="locator-help"><span data-i18n="">Map tiles use</span> <a href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>.
+        <span data-i18n="">Place searches go to</span> <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a>.
+        © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" data-i18n="">OpenStreetMap contributors</a>.</p>
+    </div>
+  </dialog>
+  <script>
+"use strict";
+
+const jpegSignature = [0xff, 0xd8];
+const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const jpegExifSignature = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00];
+const pngExifChunk = 0x65584966;
+const pngHeaderChunk = 0x49484452;
+const pngEndChunk = 0x49454e44;
+
+function matchesImageBytes(bytes, offset, signature, end = bytes.length) {
+  return offset + signature.length <= end &&
+    signature.every((value, index) => bytes[offset + index] === value);
+}
+
+function scanJpegExif(bytes) {
+  if (!matchesImageBytes(bytes, 0, jpegSignature)) {
+    throw new Error('The image is not a JPEG.');
+  }
+
+  const exifSegments = [];
+  let insertionOffset = jpegSignature.length;
+  let offset = jpegSignature.length;
+  while (offset < bytes.length) {
+    const markerRunStart = offset;
+    if (bytes[offset++] !== 0xff) break;
+    while (bytes[offset] === 0xff) offset++;
+    const start = offset - 1;
+    const marker = bytes[offset++];
+
+    if (marker === 0xd9) return { exifSegments, insertionOffset };
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (!marker || marker === 0xd8 || offset + 2 > bytes.length) break;
+
+    const length = bytes[offset] * 256 + bytes[offset + 1];
+    const end = offset + length;
+    if (length < 2 || end > bytes.length) break;
+
+    // Application segments in the main header are all before the first scan.
+    if (marker === 0xda) return { exifSegments, insertionOffset };
+    const payload = offset + 2;
+    if (marker === 0xe1 && matchesImageBytes(bytes, payload, jpegExifSignature, end)) {
+      exifSegments.push({ start, end, tiffStart: payload + jpegExifSignature.length });
+    }
+    // Keep any leading JFIF/JFXX application segments ahead of new EXIF.
+    if (marker === 0xe0 && markerRunStart === insertionOffset) insertionOffset = end;
+    offset = end;
+  }
+  throw new Error('The JPEG header is incomplete or damaged.');
+}
+
+function scanPngExif(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = pngSignature.length;
+  let tiff = null;
+  let exifStart = null;
+  let exifEnd = null;
+  while (offset + 12 <= bytes.length) {
+    const length = view.getUint32(offset);
+    const type = view.getUint32(offset + 4);
+    const payload = offset + 8;
+    const end = payload + length + 4;
+    if (length > 0x7fffffff || end > bytes.length) break;
+    if (offset === pngSignature.length && (type !== pngHeaderChunk || length !== 13)) break;
+    if (type === pngExifChunk && tiff === null) {
+      tiff = bytes.subarray(payload, payload + length);
+      exifStart = offset;
+      exifEnd = end;
+    }
+    if (type === pngEndChunk && length === 0) return { tiff, exifStart, exifEnd };
+    offset = end;
+  }
+  throw new Error('The PNG header or chunk data is incomplete or damaged.');
+}
+
+function inspectImage(bytes) {
+  if (matchesImageBytes(bytes, 0, jpegSignature)) {
+    const { exifSegments } = scanJpegExif(bytes);
+    const first = exifSegments[0];
+    return { kind: 'jpeg', tiff: first ? bytes.subarray(first.tiffStart, first.end) : null };
+  }
+  if (matchesImageBytes(bytes, 0, pngSignature)) {
+    return { kind: 'png', ...scanPngExif(bytes) };
+  }
+  throw new Error('Choose a JPEG or PNG image.');
+}
+
+function replaceJpegExif(bytes, tiff) {
+  const { exifSegments, insertionOffset } = scanJpegExif(bytes);
+  if (!tiff && exifSegments.length === 0) return bytes;
+
+  let app1 = new Uint8Array(0);
+  if (tiff) {
+    const length = 2 + jpegExifSignature.length + tiff.length;
+    if (length > 0xffff) {
+      throw new Error('The EXIF metadata is too large for a JPEG (over 65,527 bytes).');
+    }
+    app1 = new Uint8Array(length + 2);
+    app1.set([0xff, 0xe1, length >> 8, length & 0xff]);
+    app1.set(jpegExifSignature, 4);
+    app1.set(tiff, 4 + jpegExifSignature.length);
+  }
+
+  const replacedLength = exifSegments.reduce((sum, segment) => sum + segment.end - segment.start, 0);
+  const output = new Uint8Array(bytes.length - replacedLength + app1.length);
+  if (exifSegments.length === 0) {
+    output.set(bytes.subarray(0, insertionOffset));
+    output.set(app1, insertionOffset);
+    output.set(bytes.subarray(insertionOffset), insertionOffset + app1.length);
+    return output;
+  }
+
+  // Copy every byte except the EXIF segments, replacing the first one in place.
+  let from = 0;
+  let to = 0;
+  for (const segment of exifSegments) {
+    const unchanged = bytes.subarray(from, segment.start);
+    output.set(unchanged, to);
+    to += unchanged.length;
+    if (from === 0) {
+      output.set(app1, to);
+      to += app1.length;
+    }
+    from = segment.end;
+  }
+  output.set(bytes.subarray(from), to);
+  return output;
+}
+
+const { readExif, writeExif } = (() => {
+  const TYPE = { BYTE: 1, ASCII: 2, SHORT: 3, LONG: 4, RATIONAL: 5, UNDEFINED: 7, SRATIONAL: 10, IFD: 13, UTF8: 129 };
+  const typeWidth = new Map([
+    [1, 1], [2, 1], [3, 2], [4, 4], [5, 8], [6, 1], [7, 1],
+    [8, 2], [9, 4], [10, 8], [11, 4], [12, 8], [13, 4], [129, 1],
+  ]);
+  const TAG = {
+    model: 0x0110, orientation: 0x0112, modified: 0x0132, exif: 0x8769, gps: 0x8825,
+    subIfds: 0x014a, interchange: 0xa005, original: 0x9003, digitized: 0x9004,
+    originalOffset: 0x9011, digitizedOffset: 0x9012, modifiedOffset: 0x9010,
+    originalFraction: 0x9291, digitizedFraction: 0x9292, modifiedFraction: 0x9290,
+    gpsVersion: 0, latRef: 1, lat: 2, lonRef: 3, lon: 4, altRef: 5, alt: 6, dirRef: 16, dir: 17,
+  };
+  const maxUint32 = 0xffffffff;
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const emptyIfd = () => ({ offset: 0, end: 0, next: 0, entries: new Map() });
+  const bytesView = (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  function parseTiff(bytes) {
+    const view = bytesView(bytes);
+    const little = bytes[0] === 73 && bytes[1] === 73;
+    const big = bytes[0] === 77 && bytes[1] === 77;
+    if (bytes.length < 8 || (!little && !big) || view.getUint16(2, little) !== 42) {
+      throw new Error('The image contains an invalid EXIF header.');
+    }
+    function ifd(offset) {
+      if (offset < 8 || offset + 2 > bytes.length) return null;
+      const count = view.getUint16(offset, little);
+      const nextSlot = offset + 2 + count * 12;
+      if (nextSlot + 4 > bytes.length) return null;
+      const entries = new Map();
+      for (let start = offset + 2; start < nextSlot; start += 12) {
+        const tag = view.getUint16(start, little);
+        const type = view.getUint16(start + 2, little);
+        const items = view.getUint32(start + 4, little);
+        const size = typeWidth.get(type) * items;
+        const value = size > 4 ? view.getUint32(start + 8, little) : start + 8;
+        const valid = size > 0 && value >= 8 && value + size <= bytes.length;
+        if (!entries.has(tag)) entries.set(tag, { tag, type, items, size, start, value, valid });
+      }
+      return { offset, end: nextSlot + 4, next: view.getUint32(nextSlot, little), entries };
+    }
+    function integers(entry) {
+      if (!entry?.valid) return [];
+      const { items, type, value } = entry;
+      switch (type) {
+        case TYPE.BYTE:
+          return bytes.subarray(value, value + items);
+        case TYPE.SHORT:
+          return Array.from({ length: items }, (_, i) => view.getUint16(value + i * 2, little));
+        case TYPE.LONG:
+        case TYPE.IFD:
+          return Array.from({ length: items }, (_, i) => view.getUint32(value + i * 4, little));
+        default:
+          return [];
+      }
+    }
+    function text(entry) {
+      if (!entry?.valid || (entry.type !== TYPE.ASCII && entry.type !== TYPE.UTF8)) return null;
+      const value = bytes.subarray(entry.value, entry.value + entry.size);
+      const terminator = value.indexOf(0);
+      return decoder.decode(terminator < 0 ? value : value.subarray(0, terminator)).trim() || null;
+    }
+    function rationals(entry, count) {
+      if (!entry?.valid || entry.items !== count) return null;
+      const signed = entry.type === TYPE.SRATIONAL;
+      if (!signed && entry.type !== TYPE.RATIONAL) return null;
+      const read = signed ? view.getInt32.bind(view) : view.getUint32.bind(view);
+      const values = [];
+      for (let i = 0; i < count; i += 1) {
+        const numerator = read(entry.value + i * 8, little);
+        const denominator = read(entry.value + i * 8 + 4, little);
+        if (!denominator) return null;
+        values.push(numerator / denominator);
+      }
+      return values;
+    }
+
+    const root = ifd(view.getUint32(4, little));
+    if (!root) throw new Error('The image contains an invalid EXIF directory.');
+    const child = (tag) => ifd(integers(root.entries.get(tag))[0] ?? 0) ?? emptyIfd();
+    return { little, ifd, integers, text, rationals, root, exif: child(TAG.exif), gps: child(TAG.gps) };
+  }
+
+  function normalizeExifDate(value) {
+    if (typeof value !== 'string') return null;
+    const match = value.match(/^(\d{4})[:-](\d{2})[:-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    const [, year, month, day, hour, minute, second = '00'] = match;
+    const timestamp = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+    const time = new Date(`${timestamp}Z`);
+    return year !== '0000' && Number.isFinite(+time) && time.toISOString().slice(0, 19) === timestamp ? timestamp : null;
+  }
+
+  function readExif(tiff) {
+    const empty = { latitude: null, longitude: null, altitude: null, direction: null,
+      directionRef: null, date: null, model: null, orientation: null };
+    if (!tiff) return empty;
+    const { root, exif, gps, integers, text, rationals } = parseTiff(tiff);
+    const gpsText = (tag) => text(gps.entries.get(tag))?.toUpperCase();
+    function coordinate(tag, refTag, plus, minus, max) {
+      const ref = gpsText(refTag);
+      const dms = rationals(gps.entries.get(tag), 3);
+      if (!dms || (ref !== plus && ref !== minus)) return null;
+      const [degrees, minutes, seconds] = dms;
+      const value = degrees + minutes / 60 + seconds / 3600;
+      return value >= 0 && value <= max ? value * (ref === minus ? -1 : 1) : null;
+    }
+
+    const date = [
+      exif.entries.get(TAG.original), exif.entries.get(TAG.digitized), root.entries.get(TAG.modified),
+    ].map((entry) => normalizeExifDate(text(entry))).find(Boolean) ?? null;
+    const altitude = rationals(gps.entries.get(TAG.alt), 1)?.[0] ?? null;
+    const altitudeRef = integers(gps.entries.get(TAG.altRef))[0];
+    const angle = rationals(gps.entries.get(TAG.dir), 1)?.[0];
+    const direction = angle >= 0 && angle < 360 ? angle : null;
+    const directionRef = gpsText(TAG.dirRef);
+    const orientation = integers(root.entries.get(TAG.orientation))[0];
+    return {
+      latitude: coordinate(TAG.lat, TAG.latRef, 'N', 'S', 90),
+      longitude: coordinate(TAG.lon, TAG.lonRef, 'E', 'W', 180),
+      altitude: altitude === null ? null : Math.abs(altitude) * ([1, 3].includes(altitudeRef) || altitude < 0 ? -1 : 1),
+      direction,
+      directionRef: direction !== null && ['T', 'M'].includes(directionRef) ? directionRef : null,
+      date,
+      model: text(root.entries.get(TAG.model)),
+      orientation: orientation >= 1 && orientation <= 8 ? orientation : null,
+    };
+  }
+
+  function ascii(value, type = TYPE.ASCII) {
+    const bytes = encoder.encode(value + '\0');
+    return { type, count: bytes.length, bytes };
+  }
+
+  function rational(value, ceiling = Infinity) {
+    const denominator = Math.min(1e6, Math.floor(maxUint32 / (value || 1)));
+    const numerator = Math.min(Math.round(value * denominator), Math.ceil(ceiling * denominator) - 1);
+    return [numerator, denominator];
+  }
+
+  function dms(value) {
+    const ticksPerSecond = 1e6;
+    const ticksPerMinute = 60 * ticksPerSecond;
+    const ticksPerDegree = 60 * ticksPerMinute;
+    const ticks = Math.round(Math.abs(value) * ticksPerDegree);
+    return [
+      [Math.floor(ticks / ticksPerDegree), 1],
+      [Math.floor(ticks % ticksPerDegree / ticksPerMinute), 1],
+      [ticks % ticksPerMinute, ticksPerSecond],
+    ];
+  }
+
+  function writeExif(tiff, changes) {
+    if (!Object.keys(changes).length) return tiff;
+    const source = tiff ?? Uint8Array.of(73, 73, 42, 0, 0, 0, 0, 0);
+    const original = tiff ? parseTiff(tiff) : null;
+    const little = original?.little ?? true;
+    const directory = (ifd) => ({ old: ifd, entries: new Map(ifd.entries), dirty: false });
+    const root = directory(original?.root ?? emptyIfd());
+    const exif = directory(original?.exif ?? emptyIfd());
+    const gps = directory(original?.gps ?? emptyIfd());
+    const replaced = [];
+    const changed = (field) => Object.hasOwn(changes, field);
+    const spans = [];
+    let end = source.length;
+    let sourceRanges;
+
+    function set(dir, tag, value) {
+      const old = dir.entries.get(tag);
+      if (!value && !old) return;
+      if (old?.start !== undefined) replaced.push(old);
+      if (value) dir.entries.set(tag, { tag, prior: dir.old.entries.get(tag), ...value });
+      else dir.entries.delete(tag);
+      dir.dirty = true;
+    }
+    function number(type, value) {
+      const bytes = new Uint8Array(typeWidth.get(type));
+      const view = bytesView(bytes);
+      if (type === TYPE.BYTE) bytes[0] = value;
+      if (type === TYPE.SHORT) view.setUint16(0, value, little);
+      if (type === TYPE.LONG) view.setUint32(0, value, little);
+      return { type, count: 1, bytes };
+    }
+    function fractions(values) {
+      const bytes = new Uint8Array(values.length * 8);
+      const view = bytesView(bytes);
+      values.forEach(([numerator, denominator], i) => {
+        view.setUint32(i * 8, numerator, little);
+        view.setUint32(i * 8 + 4, denominator, little);
+      });
+      return { type: TYPE.RATIONAL, count: values.length, bytes };
+    }
+    function useNumber(value, min, max, label, exclusive = false) {
+      if (!Number.isFinite(value) || value < min || value > max || (exclusive && value === max)) {
+        throw new Error(`Enter a valid ${label}.`);
+      }
+      return value;
+    }
+    function updateCoordinate(field, ref, tag, max, positive, negative) {
+      if (!changed(field)) return;
+      const value = changes[field];
+      if (value === null) {
+        set(gps, ref, null);
+        set(gps, tag, null);
+        return;
+      }
+      useNumber(value, -max, max, field);
+      set(gps, ref, ascii(value < 0 ? negative : positive));
+      set(gps, tag, fractions(dms(value)));
+    }
+    if (changed('model')) {
+      const model = changes.model;
+      if (model !== null && (typeof model !== 'string' || /[\x00-\x1f\x7f]/.test(model))) {
+        throw new Error('Enter a camera model without control characters.');
+      }
+      const type = /^[\x20-\x7e]*$/.test(model ?? '') ? TYPE.ASCII : TYPE.UTF8;
+      set(root, TAG.model, model ? ascii(model, type) : null);
+    }
+    if (changed('orientation')) {
+      const orientation = changes.orientation;
+      if (orientation !== null && (!Number.isInteger(orientation) || orientation < 1 || orientation > 8)) {
+        throw new Error('The EXIF orientation is invalid.');
+      }
+      set(root, TAG.orientation, orientation === null ? null : number(TYPE.SHORT, orientation));
+    }
+    if (changed('date')) {
+      const date = normalizeExifDate(changes.date);
+      if (changes.date !== null && !date) throw new Error('Enter a valid capture date and time.');
+      set(exif, TAG.original, date ? ascii(date.replaceAll('-', ':').replace('T', ' ')) : null);
+      set(exif, TAG.originalFraction, null);
+      if (!date) {
+        for (const tag of [
+          TAG.originalOffset, TAG.digitized, TAG.digitizedOffset, TAG.digitizedFraction, TAG.modifiedOffset, TAG.modifiedFraction,
+        ]) {
+          set(exif, tag, null);
+        }
+        set(root, TAG.modified, null);
+      }
+    }
+    updateCoordinate('latitude', TAG.latRef, TAG.lat, 90, 'N', 'S');
+    updateCoordinate('longitude', TAG.lonRef, TAG.lon, 180, 'E', 'W');
+    if (changed('altitude')) {
+      const altitude = changes.altitude;
+      const formerRef = original?.integers(gps.old.entries.get(TAG.altRef))[0] ?? 0;
+      const altitudeRef = ([2, 3].includes(formerRef) ? 2 : 0) + (altitude < 0 ? 1 : 0);
+      if (altitude !== null) useNumber(altitude, -maxUint32, maxUint32, 'altitude');
+      set(gps, TAG.altRef, altitude === null ? null : number(TYPE.BYTE, altitudeRef));
+      set(gps, TAG.alt, altitude === null ? null : fractions([rational(Math.abs(altitude))]));
+    }
+    if (changed('direction') || changed('directionRef')) {
+      const oldDirection = original?.rationals(gps.old.entries.get(TAG.dir), 1)?.[0] ?? null;
+      const direction = changed('direction') ? changes.direction : oldDirection;
+      if (direction === null) {
+        set(gps, TAG.dir, null);
+        set(gps, TAG.dirRef, null);
+      } else {
+        useNumber(direction, 0, 360, 'direction from 0 to less than 360 degrees', true);
+        const oldRef = original?.text(gps.old.entries.get(TAG.dirRef))?.toUpperCase();
+        const ref = changes.directionRef ?? (['T', 'M'].includes(oldRef) ? oldRef : 'T');
+        if (!['T', 'M'].includes(ref)) throw new Error('Choose true north or magnetic north.');
+        set(gps, TAG.dirRef, ascii(ref));
+        if (changed('direction')) set(gps, TAG.dir, fractions([rational(direction, 360)]));
+      }
+    }
+    if (gps.dirty) {
+      if (gps.entries.size === 1 && gps.entries.has(TAG.gpsVersion)) set(gps, TAG.gpsVersion, null);
+      if (gps.entries.size && !gps.entries.has(TAG.gpsVersion)) {
+        set(gps, TAG.gpsVersion, { type: TYPE.BYTE, count: 4, bytes: Uint8Array.of(2, 4, 0, 0) });
+      }
+    }
+
+    function append(bytes) {
+      const offset = end + end % 2;
+      spans.push({ offset, bytes });
+      end = offset + bytes.length;
+      return offset;
+    }
+    function writeValue(entry) {
+      const { prior, bytes } = entry;
+      if (prior?.valid && prior.size > 4 && bytes.length <= prior.size) {
+        sourceRanges ??= referencedRanges(original);
+        const safe = sourceRanges && !sourceRanges.some(([from, to, owner]) =>
+          owner !== prior.start && prior.value < to && prior.value + prior.size > from);
+        if (safe) {
+          const padded = new Uint8Array(prior.size);
+          padded.set(bytes);
+          spans.push({ offset: prior.value, bytes: padded });
+          return prior.value;
+        }
+      }
+      return append(bytes);
+    }
+    function writeDirectory(dir) {
+      if (!dir.dirty) return dir.old.offset;
+      const entries = [...dir.entries.values()].sort((a, b) => a.tag - b.tag);
+      if (entries.length > 0xffff) throw new Error('This EXIF directory has too many tags.');
+      const size = 6 + entries.length * 12;
+      const reuse = dir.old.offset && size <= dir.old.end - dir.old.offset;
+      const bytes = new Uint8Array(reuse ? dir.old.end - dir.old.offset : size);
+      const view = bytesView(bytes);
+      view.setUint16(0, entries.length, little);
+      entries.forEach((entry, i) => {
+        const slot = 2 + i * 12;
+        if (!entry.bytes) {
+          // Retained entries keep the TIFF-relative offsets stored in their original bytes.
+          bytes.set(source.subarray(entry.start, entry.start + 12), slot);
+        } else {
+          view.setUint16(slot, entry.tag, little);
+          view.setUint16(slot + 2, entry.type, little);
+          view.setUint32(slot + 4, entry.count, little);
+          if (entry.bytes.length <= 4) bytes.set(entry.bytes, slot + 8);
+          else view.setUint32(slot + 8, writeValue(entry), little);
+        }
+      });
+      view.setUint32(size - 4, dir.old.next, little);
+      if (!reuse) return append(bytes);
+      spans.push({ offset: dir.old.offset, bytes });
+      return dir.old.offset;
+    }
+
+    for (const [child, tag] of [[exif, TAG.exif], [gps, TAG.gps]]) {
+      if (!child.dirty) continue;
+      const offset = child.entries.size || child.old.next ? writeDirectory(child) : 0;
+      if (offset !== child.old.offset || (offset === 0 && root.entries.has(tag))) {
+        set(root, tag, offset ? number(TYPE.LONG, offset) : null);
+      }
+    }
+    if (!root.entries.size && !root.old.next) return null;
+    const rootOffset = writeDirectory(root);
+    if (!spans.length) return tiff;
+    const output = new Uint8Array(end);
+    output.set(source);
+    for (const { offset, bytes } of spans) output.set(bytes, offset);
+    bytesView(output).setUint32(4, rootOffset, little);
+    clearRetiredValues(output, replaced);
+    return output;
+  }
+
+  function referencedRanges({ root, ifd, integers }) {
+    const used = [[0, 8]];
+    const visited = new Set();
+    const queue = [root.offset];
+    for (let i = 0; i < queue.length; i += 1) {
+      const offset = queue[i];
+      if (!offset || visited.has(offset)) continue;
+      const dir = offset === root.offset ? root : ifd(offset);
+      if (!dir) return null;
+      visited.add(offset);
+      used.push([dir.offset, dir.end]);
+      queue.push(dir.next);
+      for (const entry of dir.entries.values()) {
+        // An unrecognized type could point to an overlapping payload of unknown size.
+        if (!typeWidth.has(entry.type) && entry.items) return null;
+        if (!entry.valid) continue;
+        if (entry.size > 4) used.push([entry.value, entry.value + entry.size, entry.start]);
+        if ([TAG.exif, TAG.gps, TAG.interchange, TAG.subIfds].includes(entry.tag) || entry.type === TYPE.IFD) {
+          for (const child of integers(entry)) queue.push(child);
+        }
+      }
+      // TIFF can store image data through offsets whose byte counts are separate tags.
+      for (const [offsetTag, countTag] of [[0x0201, 0x0202], [0x0111, 0x0117], [0x0144, 0x0145]]) {
+        const offsets = integers(dir.entries.get(offsetTag));
+        const lengths = integers(dir.entries.get(countTag));
+        offsets.forEach((start, j) => {
+          if (lengths[j]) used.push([start, start + lengths[j]]);
+        });
+      }
+    }
+    return used;
+  }
+
+  function clearRetiredValues(bytes, entries) {
+    if (!entries.length) return;
+    const used = referencedRanges(parseTiff(bytes));
+    if (!used) return;
+    function clear(start, end) {
+      if (!used.some(([from, to]) => start < to && end > from)) bytes.fill(0, start, end);
+    }
+    for (const entry of entries) {
+      clear(entry.start, entry.start + 12);
+      if (entry.valid && entry.size > 4) clear(entry.value, entry.value + entry.size);
+    }
+  }
+
+  return { readExif, writeExif };
+})();
+
+const { parseLocation, initialTrueBearing } = (() => {
+  const decimal = "[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)";
+  const localizedDecimal = "[+-]?(?:\\d+(?:[.,]\\d+)?|[.,]\\d+)";
+  const decimalPart = new RegExp("^" + decimal + "$");
+  const decimalPair = new RegExp("^(" + decimal + ")\\s*[°º]?\\s*(?:[,;]\\s*|\\s+)(" + decimal + ")\\s*[°º]?$");
+  const localizedPair = new RegExp("^(" + localizedDecimal + ")\\s*[°º]?\\s*(?:;\\s*|\\s+)(" + localizedDecimal + ")\\s*[°º]?$");
+  const cardinalSuffix = /^(.+?)\s*([NSEW])\s*[,;]?\s*(.+?)\s*([NSEW])$/i;
+  const cardinalPrefix = /^([NSEW])\s*(.+?)\s*[,;]?\s*([NSEW])\s*(.+?)$/i;
+  const degrees = /^(\d+(?:[.,]\d+)?|[.,]\d+)\s*[°º]?$/;
+  const minutes = /^(\d+)(?:\s*[°º]\s*|\s+)(\d+(?:[.,]\d+)?)\s*['′’]?$/;
+  const seconds = /^(\d+)(?:\s*[°º]\s*|\s+)(\d+)(?:\s*['′’]\s*|\s+)(\d+(?:[.,]\d+)?)\s*["″”]?$/;
+  const googleHost = /^(?:(?:www|maps)\.)?google\.(?:com|[a-z]{2}|(?:com|co)\.[a-z]{2})$/;
+  const osmHost = /^(?:www\.)?(?:openstreetmap\.org|osm\.org)$/;
+  const marker = new RegExp("!3d(" + decimal + ")!4d(" + decimal + ")(?=!|/|$)", "g");
+  const viewport = new RegExp("(?:^|/)@(" + decimal + "),(" + decimal + ")(?=,|/|$)");
+  const osmView = new RegExp("(?:^#|&)map=\\d+/(" + decimal + ")/(" + decimal + ")(?:&|$)");
+
+  function location(latitude, longitude) {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+        Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+  }
+
+  const decimalNumber = (value) => Number(value.replace(",", "."));
+
+  function cardinalValue(value, hemisphere) {
+    const parts = value.trim();
+    const match = parts.match(seconds) || parts.match(minutes) || parts.match(degrees);
+    if (!match) return null;
+    const [, rawDegrees, rawMinutes = "0", rawSeconds = "0"] = match;
+    const minute = decimalNumber(rawMinutes);
+    const second = decimalNumber(rawSeconds);
+    if (minute >= 60 || second >= 60) return null;
+    const magnitude = decimalNumber(rawDegrees) + minute / 60 + second / 3600;
+    return ["S", "W"].includes(hemisphere) ? -magnitude : magnitude;
+  }
+
+  function cardinalLocation(first, firstHemisphere, second, secondHemisphere) {
+    const axis1 = firstHemisphere.toUpperCase();
+    const axis2 = secondHemisphere.toUpperCase();
+    const firstIsLatitude = axis1 === "N" || axis1 === "S";
+    if (firstIsLatitude === (axis2 === "N" || axis2 === "S")) return null;
+    const value1 = cardinalValue(first, axis1);
+    const value2 = cardinalValue(second, axis2);
+    return firstIsLatitude ? location(value1, value2) : location(value2, value1);
+  }
+
+  function parseCoordinateText(text) {
+    if (!text) return null;
+    const input = text.trim();
+    if (input.length > 256) return null;
+    const pair = input.match(decimalPair) || input.match(localizedPair);
+    if (pair) return location(decimalNumber(pair[1]), decimalNumber(pair[2]));
+    const suffix = input.match(cardinalSuffix);
+    if (suffix) return cardinalLocation(suffix[1], suffix[2], suffix[3], suffix[4]);
+    const prefix = input.match(cardinalPrefix);
+    if (prefix) return cardinalLocation(prefix[2], prefix[1], prefix[4], prefix[3]);
+    return null;
+  }
+
+  function fromParameters(params, latKey, lonKey) {
+    const lat = params.get(latKey);
+    const lon = params.get(lonKey);
+    if (!decimalPart.test(lat) || !decimalPart.test(lon)) return null;
+    return location(Number(lat), Number(lon));
+  }
+
+  function fromGoogleMap(url) {
+    const path = decodeURIComponent(url.pathname);
+    if (!/^\/maps(?:\/|$)/.test(path) && url.hostname !== "maps.google.com") return null;
+    if (/^\/maps\/dir(?:\/|$)/.test(path)) return null;
+    for (const key of ["query", "q"]) {
+      const pin = parseCoordinateText(url.searchParams.get(key)?.replace(/^loc:\s*/i, ""));
+      if (pin) return pin;
+    }
+    const place = path.match(/^\/maps\/(?:place|search)\/([^/]+)/);
+    if (place) {
+      const pin = parseCoordinateText(place[1].replaceAll("+", " "));
+      if (pin) return pin;
+      const data = path + "!" + (url.searchParams.get("data") ?? "");
+      for (const match of data.matchAll(marker)) {
+        const point = location(Number(match[1]), Number(match[2]));
+        if (point) return point;
+      }
+    }
+    for (const key of ["center", "ll"]) {
+      const point = parseCoordinateText(url.searchParams.get(key));
+      if (point) return point;
+    }
+    const center = path.match(viewport);
+    return center ? location(Number(center[1]), Number(center[2])) : null;
+  }
+
+  function fromOpenStreetMap(url) {
+    const pin = fromParameters(url.searchParams, "mlat", "mlon");
+    if (pin) return pin;
+    const view = url.hash.match(osmView);
+    if (view) return location(Number(view[1]), Number(view[2]));
+    return fromParameters(url.searchParams, "lat", "lon");
+  }
+
+  function parseLocation(value) {
+    if (typeof value !== "string" || value.length > 8192) return null;
+    const input = value.trim().replaceAll("−", "-");
+    const coordinate = parseCoordinateText(input);
+    if (coordinate) return coordinate;
+
+    try {
+      const url = new URL(/^https?:\/\//i.test(input) ? input : "https://" + input);
+      if (googleHost.test(url.hostname)) return fromGoogleMap(url);
+      if (osmHost.test(url.hostname)) return fromOpenStreetMap(url);
+    } catch {
+      // A malformed link has no coordinates to import.
+    }
+    return null;
+  }
+
+  function initialTrueBearing(from, to) {
+    const origin = location(from?.latitude, from?.longitude);
+    const target = location(to?.latitude, to?.longitude);
+    if (!origin || !target || Math.abs(origin.latitude) === 90) return null;
+    if (Math.abs(target.latitude) === 90) return target.latitude === 90 ? 0 : 180;
+
+    const radians = Math.PI / 180;
+    const start = origin.latitude * radians;
+    const end = target.latitude * radians;
+    const difference = ((target.longitude - origin.longitude + 540) % 360 - 180) * radians;
+    const east = Math.sin(difference) * Math.cos(end);
+    const north = Math.cos(start) * Math.sin(end) - Math.sin(start) * Math.cos(end) * Math.cos(difference);
+    if (Math.hypot(east, north) < 1e-12) return null;
+    return (Math.atan2(east, north) / radians + 360) % 360;
+  }
+
+  return { parseLocation, initialTrueBearing };
+})();
+
+function mountExifMap(frame, { center, mode, origin, onPoint, onStatus, language = 'en' }) {
+  const lang = language === 'fr' ? 'fr' : 'en';
+  const text = lang === 'fr' ? {
+    cameraPosition: 'Emplacement de prise de vue',
+    selectedPosition: 'Emplacement sélectionné',
+    searching: 'Recherche en cours…',
+    noResults: 'Aucun résultat. Essayez une autre recherche.',
+    chooseResult: 'Choisissez un lieu dans les résultats.',
+    searchUnavailable: 'La recherche est indisponible. Réessayez ou collez des coordonnées.',
+    loadingMap: 'Chargement de la carte…',
+    tilesUnavailable: 'Le fond de carte est indisponible. Recherchez un lieu ou collez des coordonnées.',
+    mapUnavailable: 'Impossible d’ouvrir la carte. Recherchez un lieu ou collez des coordonnées.',
+    bearingMap: 'Carte pour choisir un point de repère',
+    locationMap: 'Carte pour choisir le lieu de prise de vue',
+    addressOrLandmark: 'Adresse ou point de repère',
+    search: 'Rechercher',
+    matchingPlaces: 'Résultats de la recherche',
+    useCenter: 'Utiliser le centre de la carte',
+    mapLocale: {
+      'Map.Title': 'Carte',
+      'Marker.Title': 'Repère sur la carte',
+      'NavigationControl.ZoomIn': 'Zoom avant',
+      'NavigationControl.ZoomOut': 'Zoom arrière',
+      'CooperativeGesturesHandler.WindowsHelpText': 'Maintenez Ctrl et faites défiler pour zoomer sur la carte',
+      'CooperativeGesturesHandler.MacHelpText': 'Maintenez ⌘ et faites défiler pour zoomer sur la carte',
+      'CooperativeGesturesHandler.MobileHelpText': 'Déplacez la carte avec deux doigts',
+    },
+  } : {
+    cameraPosition: 'Camera position',
+    selectedPosition: 'Selected position',
+    searching: 'Searching…',
+    noResults: 'No places found. Try another search.',
+    chooseResult: 'Choose a matching place.',
+    searchUnavailable: 'Place search is unavailable. Try again or paste coordinates.',
+    loadingMap: 'Loading map…',
+    tilesUnavailable: 'Map tiles are unavailable. You can search for a place or paste coordinates.',
+    mapUnavailable: 'This browser could not open the map. You can search for a place or paste coordinates.',
+    bearingMap: 'Map for selecting a landmark',
+    locationMap: 'Map for selecting the camera position',
+    addressOrLandmark: 'Address or landmark',
+    search: 'Search',
+    matchingPlaces: 'Matching places',
+    useCenter: 'Use map center',
+  };
+  function validPoint(point) {
+    return point != null && Number.isFinite(point.latitude) && Number.isFinite(point.longitude) &&
+      Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
+  }
+
+  function mapFrame(settings) {
+    const { channel, center, mode, origin, lang, text } = settings;
+    const byId = (id) => document.getElementById(id);
+    const searchButton = byId('search-button');
+    const queryInput = byId('query');
+    const results = byId('results');
+    const searchStatus = byId('search-status');
+    const mapStatus = byId('map-status');
+    const useCenter = byId('use-center');
+    const assetRoot = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/';
+    let map;
+    let marker;
+    let pendingPoint;
+    let searchRequest;
+    let lastSearch = 0;
+    let loaded = false;
+
+    const send = (type, payload) => parent.postMessage({ channel, type, ...payload }, '*');
+    function status(message) {
+      mapStatus.textContent = message;
+      send('status', { message });
+    }
+
+    function lngLat(point) {
+      return [point.longitude, Math.max(-85.05112878, Math.min(85.05112878, point.latitude))];
+    }
+
+    function mapPoint(lngLat) {
+      return { latitude: lngLat.lat, longitude: lngLat.wrap().lng };
+    }
+
+    function makeMarker(point, isOrigin) {
+      const element = document.createElement('div');
+      element.className = isOrigin ? 'camera-dot' : 'map-pin';
+      element.setAttribute('role', 'img');
+      element.setAttribute('aria-label', isOrigin ? text.cameraPosition : text.selectedPosition);
+      const dot = new maplibregl.Marker({ element, anchor: isOrigin ? 'center' : 'bottom' });
+      return dot.setLngLat(lngLat(point)).addTo(map);
+    }
+
+    function showPoint(point, recenter) {
+      pendingPoint = point;
+      if (!map) return;
+      if (marker) {
+        marker.remove();
+        marker = null;
+      }
+      if (!point) return;
+      marker = makeMarker(point, false);
+      if (recenter) map.jumpTo({ center: lngLat(point), zoom: Math.max(15, map.getZoom()) });
+    }
+
+    function choosePoint(point, recenter = false) {
+      if (Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) return;
+      showPoint(point, recenter);
+      send('point', { point });
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== parent || event.data?.channel !== channel || event.data.type !== 'set-point') return;
+      const point = event.data.point;
+      if (point === null || (Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude) &&
+        Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180)) {
+        showPoint(point, true);
+      }
+    });
+
+    async function searchPlaces() {
+      const query = queryInput.value.trim();
+      if (!query) {
+        queryInput.focus();
+        return;
+      }
+      if (Date.now() - lastSearch < 1_000) return;
+      lastSearch = Date.now();
+      if (searchRequest) searchRequest.abort();
+      const request = new AbortController();
+      searchRequest = request;
+      const timeout = setTimeout(() => request.abort(), 10_000);
+      results.replaceChildren();
+      results.hidden = true;
+      searchStatus.textContent = text.searching;
+
+      try {
+        const url = new URL('https://photon.komoot.io/api/');
+        url.searchParams.set('q', query);
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('lang', lang);
+        const response = await fetch(url, { signal: request.signal, credentials: 'omit' });
+        if (!response.ok) throw new Error(text.searchUnavailable);
+        const data = await response.json();
+        if (searchRequest !== request) return;
+        for (const feature of (Array.isArray(data.features) ? data.features : []).slice(0, 5)) {
+          const coordinates = feature?.geometry?.coordinates;
+          if (!Array.isArray(coordinates)) continue;
+          const [longitude, latitude] = coordinates;
+          if (!Number.isFinite(longitude) || !Number.isFinite(latitude) ||
+            Math.abs(longitude) > 180 || Math.abs(latitude) > 90) continue;
+          const { name, street, housenumber, city, state, country } = feature.properties ?? {};
+          const streetAddress = [street, housenumber].filter((part) => typeof part === 'string').join(' ');
+          const labels = [name, streetAddress, city, state, country].filter((part) => typeof part === 'string' && part.trim());
+          const label = [...new Set(labels)].join(', ') || latitude.toFixed(5) + ', ' + longitude.toFixed(5);
+          const item = document.createElement('li');
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = label;
+          button.addEventListener('click', () => {
+            choosePoint({ latitude, longitude }, true);
+            results.hidden = true;
+            searchStatus.textContent = '';
+            queryInput.focus();
+          });
+          item.append(button);
+          results.append(item);
+        }
+        results.hidden = !results.children.length;
+        searchStatus.textContent = results.hidden ? text.noResults : text.chooseResult;
+      } catch {
+        if (searchRequest === request) searchStatus.textContent = text.searchUnavailable;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    searchButton.addEventListener('click', searchPlaces);
+    queryInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.isComposing) searchPlaces();
+    });
+
+    function loadAsset(tag, url, integrity) {
+      return new Promise((resolve, reject) => {
+        const asset = document.createElement(tag);
+        asset.crossOrigin = 'anonymous';
+        asset.integrity = integrity;
+        if (tag === 'link') {
+          asset.rel = 'stylesheet';
+          asset.href = url;
+        } else {
+          asset.src = url;
+        }
+        asset.addEventListener('load', resolve, { once: true });
+        asset.addEventListener('error', reject, { once: true });
+        document.head.append(asset);
+      });
+    }
+
+    async function start() {
+      status(text.loadingMap);
+      const timeout = setTimeout(() => {
+        if (!loaded) status(text.tilesUnavailable);
+      }, 12_000);
+      try {
+        await Promise.all([
+          loadAsset('script', assetRoot + 'maplibre-gl.js', 'sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp'),
+          loadAsset('link', assetRoot + 'maplibre-gl.css', 'sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK'),
+        ]);
+        const startPoint = pendingPoint || center || origin;
+        map = new maplibregl.Map({
+          container: 'map',
+          style: 'https://tiles.openfreemap.org/styles/liberty',
+          center: startPoint ? lngLat(startPoint) : [0, 23],
+          zoom: startPoint ? 15 : 1,
+          maxZoom: 20,
+          dragRotate: false,
+          touchPitch: false,
+          attributionControl: false,
+          cooperativeGestures: true,
+          locale: text.mapLocale,
+        });
+        map.touchZoomRotate.disableRotation();
+        map.keyboard.disableRotation();
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        map.getCanvas().setAttribute('aria-label', mode === 'bearing' ? text.bearingMap : text.locationMap);
+
+        map.on('click', (event) => choosePoint(mapPoint(event.lngLat)));
+        map.once('load', () => {
+          loaded = true;
+          clearTimeout(timeout);
+          useCenter.disabled = false;
+          status('');
+        });
+        if (origin) makeMarker(origin, true);
+        if (pendingPoint) showPoint(pendingPoint, true);
+        useCenter.addEventListener('click', () => choosePoint(mapPoint(map.getCenter())));
+      } catch {
+        clearTimeout(timeout);
+        status(text.mapUnavailable);
+      }
+    }
+
+    send('ready');
+    start();
+  }
+
+  const channel = 'exif-map-' + crypto.getRandomValues(new Uint32Array(4)).join('-');
+  let disposed = false;
+  let ready = false;
+  let point = null;
+  let hasPointUpdate = false;
+
+  function postPoint() {
+    if (ready && hasPointUpdate) frame.contentWindow.postMessage({ channel, type: 'set-point', point }, '*');
+  }
+
+  function receive(event) {
+    if (disposed || event.source !== frame.contentWindow || event.origin !== 'null' || event.data?.channel !== channel) return;
+    const { type, point, message } = event.data;
+    if (type === 'ready') {
+      ready = true;
+      postPoint();
+    } else if (type === 'point' && validPoint(point)) {
+      onPoint({ latitude: point.latitude, longitude: point.longitude });
+    } else if (type === 'status' && typeof message === 'string' && message.length <= 110) {
+      onStatus(message);
+    }
+  }
+
+  window.addEventListener('message', receive);
+  const settings = JSON.stringify({
+    channel,
+    lang,
+    text,
+    center: validPoint(center) ? { latitude: center.latitude, longitude: center.longitude } : null,
+    mode: mode === 'bearing' ? 'bearing' : 'location',
+    origin: mode === 'bearing' && validPoint(origin) ? { latitude: origin.latitude, longitude: origin.longitude } : null,
+  });
+  frame.srcdoc = `<!doctype html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  *,*::before,*::after { box-sizing: border-box; }
+  html,body { height: 100%; }
+  body {
+    margin: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr);
+    font: .875rem/1.4 system-ui,sans-serif;
+    color: #192b26;
+    background: #e8eee9;
+  }
+  #search {
+    z-index: 2;
+    position: relative;
+    padding: .52rem .6rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    background: #fbfcfa;
+    border-bottom: 1px solid #d5dfd8;
+    min-width: 0;
+  }
+  input,button { font: inherit; }
+  input {
+    flex: 1;
+    width: 4rem;
+    min-width: 0;
+    padding: .4rem .48rem;
+    border: 1px solid #bccbc1;
+    border-radius: .38rem;
+    color: #192b26;
+  }
+  button {
+    min-height: 2rem;
+    padding: .35rem .58rem;
+    border: 1px solid #bbd2c3;
+    border-radius: .38rem;
+    background: #f1f7f1;
+    color: #195943;
+    font-weight: 640;
+    cursor: pointer;
+  }
+  button:hover { background: #e5f2e7; }
+  button:disabled { opacity: .54; cursor: default; }
+  button:focus-visible,input:focus-visible { outline: 2px solid #248364; outline-offset: 1px; }
+  #search-status,#results {
+    position: absolute;
+    right: .6rem;
+    left: .6rem;
+    z-index: 3;
+    margin: 0;
+    background: #fbfcfa;
+  }
+  #search-status {
+    top: 100%;
+    padding: .4rem .55rem;
+    border: 1px solid #d5dfd8;
+    font-size: .82rem;
+  }
+  #search-status:empty { display: none; }
+  #results {
+    top: calc(100% + 1.98rem);
+    padding: 0;
+    list-style: none;
+    border: 1px solid #d5dfd8;
+    border-radius: 0 0 .38rem .38rem;
+    overflow: auto;
+    max-height: 11rem;
+    box-shadow: 0 4px 10px #20362814;
+  }
+  #results li + li { border-top: 1px solid #d5dfd8; }
+  #results button { width: 100%; text-align: left; border: 0; border-radius: 0; background: transparent; }
+  #results button:hover { background: #e5f2e7; }
+  #map-wrap { display: grid; grid-template: 1fr / 1fr; min-height: 0; position: relative; }
+  #map { grid-area: 1/1; width: 100%; height: 100%; min-height: 0; }
+  #map canvas { cursor: crosshair; }
+  #map-status {
+    grid-area: 1/1;
+    place-self: center;
+    z-index: 1;
+    width: min(24rem,100% - 2rem);
+    padding: .55rem;
+    background: #fbfcfa;
+    border-radius: .42rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  #map-status:empty { display: none; }
+  #use-center {
+    position: absolute;
+    left: .6rem;
+    bottom: 1.5rem;
+    z-index: 1;
+    box-shadow: 0 2px 4px #2036281c;
+  }
+  .map-pin,.camera-dot {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+  }
+  .map-pin::before,.camera-dot::before {
+    content: "";
+    width: 19px;
+    height: 19px;
+    border: 2px solid #fff;
+    border-radius: 100%;
+    background: #1b624b;
+    box-shadow: 0 1px 4px #0006;
+  }
+  .map-pin::before {
+    border-bottom-left-radius: 0;
+    transform: translateY(2px) rotate(-45deg);
+    transform-origin: 40% 60%;
+  }
+  .camera-dot::before { background: #235eaa; width: 16px; height: 16px; }
+  .map-credit {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    max-width: 100%;
+    z-index: 1;
+    padding: .12rem .34rem;
+    background: #fbfcfaed;
+    font-size: .66rem;
+    pointer-events: none;
+  }
+  .screen-reader {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="search" role="search">
+  <label class="screen-reader" for="query">${text.addressOrLandmark}</label>
+  <input id="query" type="search" placeholder="${text.addressOrLandmark}" maxlength="200" autocomplete="off">
+  <button id="search-button" type="button">${text.search}</button>
+  <p id="search-status" role="status"></p>
+  <ul id="results" aria-label="${text.matchingPlaces}" hidden></ul>
+</div>
+<div id="map-wrap">
+  <div id="map"></div>
+  <p id="map-status" role="status"></p>
+  <button id="use-center" type="button" disabled>${text.useCenter}</button>
+  <div class="map-credit">OpenFreeMap · © OpenMapTiles · © OpenStreetMap</div>
+</div>
+<script>(${mapFrame.toString()})(${settings});</scr` + 'ipt></body></html>';
+
+  return {
+    setPoint(value) {
+      if (disposed || (value !== null && !validPoint(value))) return;
+      point = value;
+      hasPointUpdate = true;
+      postPoint();
+    },
+    destroy() {
+      if (disposed) return;
+      disposed = true;
+      window.removeEventListener('message', receive);
+      frame.removeAttribute('srcdoc');
+    },
+  };
+}
+
+function mountExifCompass(dial, readout, { onChange, translate }) {
+  const cardinals = [
+    ["N", "north"], ["NE", "northeast"], ["E", "east"], ["SE", "southeast"],
+    ["S", "south"], ["SW", "southwest"], ["W", "west"], ["NW", "northwest"],
+  ];
+  function wrap(value) {
+    const remainder = value % 360;
+    return remainder < 0 ? remainder + 360 : remainder || 0;
+  }
+  const disabled = () => dial.getAttribute("aria-disabled") === "true";
+  let direction = null;
+  let reference = null;
+  let activePointer = null;
+  let lastPointerDirection = null;
+
+  function update(value, north, formatNumber = String) {
+    direction = Number.isFinite(value) && value >= 0 && value < 360 ? value : null;
+    reference = north === "T" || north === "M" ? north : null;
+    const heading = direction ?? 0;
+
+    dial.style.setProperty("--heading", heading + "deg");
+    dial.dataset.set = String(direction !== null);
+    dial.setAttribute("aria-valuenow", String(heading));
+
+    if (direction === null) {
+      readout.textContent = translate("Direction unset");
+      dial.setAttribute("aria-valuetext", readout.textContent);
+      return;
+    }
+
+    const displayed = wrap(Math.round(heading * 1_000) / 1_000);
+    const [label, name] = cardinals[Math.round(displayed / 45) % 8];
+    const northReference = reference === "M" ? "magnetic north" : reference === "T" ? "true north" : "north reference unspecified";
+    const bearing = formatNumber(displayed);
+    const unit = translate(displayed === 1 ? "degree" : "degrees");
+    readout.textContent = translate("{bearing}° {cardinal}", { bearing, cardinal: translate(label) });
+    dial.setAttribute("aria-valuetext", translate("{bearing} {unit}, {direction}, {reference}", {
+      bearing, unit, direction: translate(name), reference: translate(northReference),
+    }));
+  }
+
+  function choose(value) {
+    if (value !== direction || reference === null) onChange(value);
+  }
+
+  function aimAt(event) {
+    if (event.pointerId !== activePointer || disabled()) return;
+    const bounds = dial.getBoundingClientRect();
+    const x = event.clientX - bounds.left - bounds.width / 2;
+    const y = event.clientY - bounds.top - bounds.height / 2;
+    const deadZone = Math.min(20, Math.min(bounds.width, bounds.height) * 0.1);
+    if (Math.hypot(x, y) < deadZone) return;
+
+    const heading = Math.round(Math.atan2(x, -y) * 180 / Math.PI);
+    const cardinal = Math.round(heading / 90) * 90;
+    const value = wrap(Math.abs(heading - cardinal) <= 1 ? cardinal : heading);
+    if (value === lastPointerDirection) return;
+    lastPointerDirection = value;
+    choose(value);
+  }
+
+  function stopAiming(event) {
+    if (event.pointerId !== activePointer) return;
+    activePointer = null;
+    lastPointerDirection = null;
+  }
+
+  dial.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || activePointer !== null || disabled()) return;
+    activePointer = event.pointerId;
+    dial.focus({ preventScroll: true });
+    dial.setPointerCapture(event.pointerId);
+    aimAt(event);
+  });
+  dial.addEventListener("pointermove", aimAt);
+  dial.addEventListener("pointerup", (event) => {
+    aimAt(event);
+    stopAiming(event);
+  });
+  dial.addEventListener("pointercancel", stopAiming);
+  dial.addEventListener("lostpointercapture", stopAiming);
+
+  dial.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || disabled()) return;
+    const step = event.shiftKey ? 15 : 1;
+    const heading = direction ?? 0;
+    let value;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowUp": value = heading + step; break;
+      case "ArrowLeft":
+      case "ArrowDown": value = heading - step; break;
+      case "PageUp": value = heading + 15; break;
+      case "PageDown": value = heading - 15; break;
+      case "Home": value = 0; break;
+      case "End": value = 359; break;
+      default: return;
+    }
+    event.preventDefault();
+    const rounded = Number(wrap(value).toFixed(9));
+    choose(rounded === 360 ? 0 : rounded);
+  });
+
+  update(null, null);
+  return { update };
+}
+
+const frenchCopy = {
+  // Page, upload, and editing form.
+  "Photo EXIF Editor": "Éditeur EXIF pour photos",
+  "Read and edit a photo’s embedded metadata, then save it as a new JPG.": "Consultez et modifiez les métadonnées intégrées à une photo, puis enregistrez-la dans un nouveau fichier JPG.",
+  "Photo": "Photo",
+  "Drop a photo here": "Déposez une photo ici",
+  "JPG or PNG": "JPG ou PNG",
+  "Choose image": "Choisir une image",
+  "Selected photo preview": "Aperçu de la photo sélectionnée",
+  "Choose another image": "Choisir une autre image",
+  "Photos stay on this device. Map and elevation lookups use the internet.": "Vos photos restent sur cet appareil. La carte et la recherche d’altitude nécessitent une connexion Internet.",
+  "EXIF metadata": "Métadonnées EXIF",
+  "Choose a photo to see its saved values.": "Choisissez une photo pour afficher ses métadonnées.",
+  "Location and camera direction": "Lieu et direction de prise de vue",
+  "Latitude": "Latitude",
+  "Longitude": "Longitude",
+  "Altitude": "Altitude",
+  "Find on map or paste coordinates": "Repérer sur la carte ou coller des coordonnées",
+  "Camera direction": "Direction de prise de vue",
+  "Direction reference": "Nord de référence",
+  "Unspecified": "Non renseigné",
+  "True north": "Nord géographique",
+  "Magnetic north": "Nord magnétique",
+  "Capture details": "Informations de prise de vue",
+  "Capture date and time": "Date et heure de prise de vue",
+  "Camera model": "Modèle de l’appareil",
+  "Enter a custom model…": "Saisir un autre modèle…",
+  "Custom camera model": "Autre modèle d’appareil",
+  "Download JPG": "Télécharger le JPG",
+  "Download HTML": "Télécharger le fichier HTML",
+  "Language": "Langue",
+
+  // Compass and metadata help.
+  "Aim the camera on a compass": "Indiquer la direction avec la boussole",
+  "Camera compass": "Boussole de prise de vue",
+  "Direction unset": "Direction non renseignée",
+  "Drag the camera or tap a direction.": "Faites glisser l’appareil ou touchez une direction.",
+  "Arrow keys turn 1°. Hold Shift to turn 15°.": "Les flèches tournent de 1°. Maintenez Maj pour tourner de 15°.",
+  "Magnetic north reference": "Référence au nord magnétique",
+  "True north reference": "Référence au nord géographique",
+  "North reference unspecified": "Nord de référence non renseigné",
+  "True north by default": "Nord géographique par défaut",
+  "Help filling in other fields": "Aide pour renseigner les autres champs",
+  "Set the photo location to enable the direction and elevation tools.": "Indiquez le lieu de prise de vue pour activer les outils de direction et d’altitude.",
+  "Choose a landmark the camera was pointing toward. The editor calculates the bearing from the photo location.": "Choisissez un point de repère vers lequel l’appareil était orienté. L’éditeur calcule la direction depuis le lieu de prise de vue.",
+  "Set direction from a landmark": "Calculer la direction à partir d’un repère",
+  "Look up ground elevation at the photo location with Open-Elevation. Adjust for height above the ground if you know it.": "Recherchez l’altitude du sol au lieu de prise de vue avec Open-Elevation. Ajoutez la hauteur de l’appareil au-dessus du sol si vous la connaissez.",
+  "Look up ground elevation": "Rechercher l’altitude du sol",
+  "Use estimate": "Utiliser l’estimation",
+  "Use the file’s modified time if it matches when you took the photo. Copying or editing a file can change this time.": "Utilisez la date et l’heure de modification du fichier si elles correspondent à la prise de vue. La copie ou la modification du fichier peut changer cette valeur.",
+  "Use file modified time": "Utiliser la date et l’heure de modification",
+  "Check the phone’s About screen or read the model from another photo taken with the same camera.": "Consultez la rubrique « À propos » du téléphone ou récupérez le modèle depuis une autre photo prise avec le même appareil.",
+  "Copy model from another photo": "Copier le modèle d’une autre photo",
+  "N": "N",
+  "NE": "NE",
+  "E": "E",
+  "SE": "SE",
+  "S": "S",
+  "SW": "SO",
+  "W": "O",
+  "NW": "NO",
+  "north": "nord",
+  "northeast": "nord-est",
+  "east": "est",
+  "southeast": "sud-est",
+  "south": "sud",
+  "southwest": "sud-ouest",
+  "west": "ouest",
+  "northwest": "nord-ouest",
+  "magnetic north": "nord magnétique",
+  "true north": "nord géographique",
+  "north reference unspecified": "nord de référence non renseigné",
+  "degree": "degré",
+  "degrees": "degrés",
+  "{bearing}° {cardinal}": "{bearing}° {cardinal}",
+  "{bearing} {unit}, {direction}, {reference}": "{bearing} {unit}, {direction}, {reference}",
+
+  // Location dialog and parent attribution.
+  "Find the photo location": "Repérer le lieu de prise de vue",
+  "Find a landmark": "Trouver un point de repère",
+  "Close": "Fermer",
+  "Coordinates or map link": "Coordonnées ou lien cartographique",
+  "48.8566, 2.3522": "48,8566 ; 2,3522",
+  "Paste latitude and longitude or a full Google Maps or OpenStreetMap link containing coordinates.": "Collez la latitude et la longitude, ou un lien Google Maps ou OpenStreetMap complet contenant les coordonnées.",
+  "Set photo location": "Indiquer le lieu de prise de vue",
+  "Set camera direction": "Indiquer la direction de prise de vue",
+  "Open online map": "Ouvrir la carte en ligne",
+  "Hide map": "Masquer la carte",
+  "Map to choose a point": "Carte pour choisir un point",
+  "Choose a point the camera was facing. The photo location is the starting point.": "Choisissez un point vers lequel l’appareil était orienté. Le lieu de prise de vue sert de point de départ.",
+  "Choose the spot where you stood when taking the photo.": "Choisissez l’endroit d’où vous avez pris la photo.",
+  "Map tiles use": "Le fond de carte est fourni par",
+  "Place searches go to": "Les recherches de lieux sont envoyées à",
+  "OpenStreetMap contributors": "les contributeurs d’OpenStreetMap",
+  "Loading online map…": "Chargement de la carte en ligne…",
+  "Selected location {point}": "Lieu sélectionné · {point}",
+  "Choose a different point to calculate a direction.": "Choisissez un point différent pour calculer la direction.",
+  "Camera direction {bearing}° true north": "Direction de prise de vue · {bearing}° par rapport au nord géographique",
+  "Enter valid latitude and longitude or a full map link containing coordinates.": "Saisissez une latitude et une longitude valides, ou collez un lien cartographique complet contenant les coordonnées.",
+
+  // Parent statuses and validation.
+  "{format} · {width} × {height} px": "{format} · {width} × {height} px",
+  "Edit or add values. Clear a field to remove its EXIF value.": "Modifiez ou ajoutez des valeurs. Videz un champ pour supprimer sa valeur EXIF.",
+  "This photo has no saved values for these fields. You can add your own.": "Aucune valeur n’est enregistrée pour ces champs. Vous pouvez les renseigner.",
+  "PNG is converted to JPG. Transparent areas become white.": "Le PNG est converti en JPG. Les zones transparentes deviennent blanches.",
+  "Looking up ground elevation…": "Recherche de l’altitude du sol…",
+  "Elevation lookup is unavailable.": "La recherche d’altitude est indisponible.",
+  "No ground elevation was returned for this location.": "Aucune altitude du sol n’a été trouvée pour ce lieu.",
+  "Estimated ground elevation {elevation} m.": "Altitude du sol estimée à {elevation} m.",
+  "Ground elevation is unavailable. You can enter a known altitude in metres.": "L’altitude du sol est indisponible. Vous pouvez saisir une altitude connue en mètres.",
+  "Altitude set to the estimated ground elevation.": "L’altitude estimée du sol a été renseignée.",
+  "Capture date field filled from the file’s modified time.": "La date et l’heure de modification du fichier ont été reprises comme date et heure de prise de vue.",
+  "Reading the reference photo…": "Lecture de la photo de référence…",
+  "No camera model was found in that photo’s EXIF.": "Aucun modèle d’appareil n’a été trouvé dans les métadonnées EXIF de cette photo.",
+  "The camera model was edited while the reference photo was being read.": "Le modèle de l’appareil a été modifié pendant la lecture de la photo de référence.",
+  "Camera model copied from the reference photo.": "Le modèle de l’appareil a été copié depuis la photo de référence.",
+  "Could not read the reference photo. Choose another JPG or PNG.": "Impossible de lire la photo de référence. Choisissez une autre image JPG ou PNG.",
+  "Opening photo…": "Ouverture de la photo…",
+  "The photo could not be opened.": "Impossible d’ouvrir la photo.",
+  "This photo could not be decoded. Choose another JPG or PNG.": "Impossible de décoder cette photo. Choisissez une autre image JPG ou PNG.",
+  "Drop one JPG or PNG at a time.": "Déposez une seule image JPG ou PNG à la fois.",
+  "Enter a direction from 0° to less than 360°.": "Saisissez une direction de 0° à moins de 360°.",
+  "This browser could not convert the PNG to JPG.": "Ce navigateur n’a pas pu convertir le PNG en JPG.",
+  "The browser could not encode this PNG as a JPG. Try a smaller image.": "Le navigateur n’a pas pu convertir ce PNG en JPG. Essayez une image plus petite.",
+  "Preparing JPG…": "Préparation du JPG…",
+  "Preparing your JPG…": "Préparation de votre JPG…",
+  "Download started.": "Téléchargement lancé.",
+  "The JPG could not be created.": "Impossible de créer le fichier JPG.",
+  "HTML download started.": "Téléchargement du fichier HTML lancé.",
+  "The HTML file could not be downloaded.": "Impossible de télécharger le fichier HTML.",
+
+  // Errors from the image containers and EXIF writer.
+  "The image is not a JPEG.": "L’image n’est pas au format JPEG.",
+  "The JPEG header is incomplete or damaged.": "L’en-tête JPEG est incomplet ou endommagé.",
+  "The PNG header or chunk data is incomplete or damaged.": "L’en-tête PNG ou ses blocs de données sont incomplets ou endommagés.",
+  "Choose a JPEG or PNG image.": "Choisissez une image JPEG ou PNG.",
+  "The EXIF metadata is too large for a JPEG (over 65,527 bytes).": "Les métadonnées EXIF sont trop volumineuses pour un fichier JPEG (plus de 65 527 octets).",
+  "The image contains an invalid EXIF header.": "L’image contient un en-tête EXIF non valide.",
+  "The image contains an invalid EXIF directory.": "L’image contient un répertoire EXIF non valide.",
+  "Enter a valid latitude.": "Saisissez une latitude valide.",
+  "Enter a valid longitude.": "Saisissez une longitude valide.",
+  "Enter a valid altitude.": "Saisissez une altitude valide.",
+  "Enter a valid direction from 0 to less than 360 degrees.": "Saisissez une direction de 0° à moins de 360°.",
+  "Enter a camera model without control characters.": "Saisissez un modèle d’appareil sans caractères de contrôle.",
+  "The EXIF orientation is invalid.": "L’orientation EXIF n’est pas valide.",
+  "Enter a valid capture date and time.": "Saisissez une date et une heure de prise de vue valides.",
+  "Choose true north or magnetic north.": "Choisissez le nord géographique ou le nord magnétique.",
+  "This EXIF directory has too many tags.": "Ce répertoire EXIF contient trop de balises.",
+};
+
+(() => {
+  // Capture the initial app before it displays a photo or applies a language preference.
+  const htmlDownload = new Blob(["<!doctype html>\n", document.documentElement.outerHTML, "\n"],
+    { type: "text/html;charset=utf-8" });
+  const get = (id) => document.getElementById(id);
+  const textCopies = Array.from(document.querySelectorAll("[data-i18n]"), (element) => [element, element.textContent]);
+  const attributeCopies = [
+    ["aria", "aria-label"], ["alt", "alt"], ["title", "title"], ["placeholder", "placeholder"],
+  ].flatMap(([marker, attribute]) => Array.from(document.querySelectorAll("[data-i18n-" + marker + "]"),
+    (element) => [element, attribute, element.getAttribute(attribute)]));
+  const statusCopies = new Map();
+  const numberFormats = {
+    en: new Intl.NumberFormat("en", { maximumFractionDigits: 3, useGrouping: false }),
+    fr: new Intl.NumberFormat("fr", { maximumFractionDigits: 3, useGrouping: false }),
+  };
+  const languageKey = "photo-exif-language";
+  let language = "en";
+  const editable = ["latitude", "longitude", "altitude", "direction", "directionRef", "date", "model"];
+  const numeric = new Set(["latitude", "longitude", "altitude", "direction"]);
+  const fields = Object.fromEntries(editable.map((name) => [name, get(name)]));
+  const photoPanel = get("photo-panel");
+  const dropzone = get("dropzone");
+  const preview = get("preview");
+  const picker = get("file");
+  const choose = get("choose");
+  const chooseOther = get("choose-other");
+  const photoStatus = get("photo-status");
+  const metadataStatus = get("metadata-status");
+  const editHint = get("edit-hint");
+  const exportStatus = get("export-status");
+  const form = get("editor");
+  const download = get("download");
+  const modelPicker = get("model-preset");
+  const customModel = get("model-custom");
+  const customChoice = "__custom__";
+  const cameraPresets = new Set(Array.from(modelPicker.querySelectorAll("optgroup option"), (option) => option.value));
+  const compassTool = get("compass-tool");
+  const compassDial = get("compass-dial");
+  const compassReference = get("compass-reference");
+  const guide = get("metadata-guide");
+  const locator = get("location-dialog");
+  const locationText = get("location-text");
+  const locatorStatus = get("locator-status");
+  const mapRegion = get("map-region");
+  const mapStatus = get("map-status");
+  const toggleMap = get("toggle-map");
+  const findElevation = get("find-elevation");
+  const useElevation = get("apply-elevation");
+  const elevationStatus = get("elevation-status");
+  const referencePhoto = get("reference-photo");
+  const referenceStatus = get("reference-status");
+  let source = null;
+  let loadVersion = 0;
+  let loading = false;
+  let exporting = false;
+  let dropDepth = 0;
+  let locatorMode = "location";
+  let locatorOrigin = null;
+  let onlineMap = null;
+  let elevationLookup = null;
+  let elevationGuess = null;
+  let positionKey = "";
+  let referenceVersion = 0;
+  let readingReference = false;
+  const compass = mountExifCompass(compassDial, get("compass-reading"), {
+    translate: t,
+    onChange(direction) {
+      if (!source || loading || exporting) return;
+      source.preferredRef ||= "T";
+      setField("direction", Number(direction.toFixed(9)) % 360);
+    },
+  });
+
+  function t(message, values) {
+    const copy = language === "fr" && Object.hasOwn(frenchCopy, message) ? frenchCopy[message] : message;
+    return values ? copy.replace(/\{(\w+)\}/g, (placeholder, key) => values[key] ?? placeholder) : copy;
+  }
+
+  function showStatus(element, message, error = false, values) {
+    statusCopies.set(element, { message, values });
+    element.textContent = t(message, values);
+    element.dataset.error = String(error);
+  }
+
+  function applyLanguage(next) {
+    language = next === "fr" ? "fr" : "en";
+    document.documentElement.lang = language;
+    get("language-en").setAttribute("aria-pressed", String(language === "en"));
+    get("language-fr").setAttribute("aria-pressed", String(language === "fr"));
+    for (const [element, message] of textCopies) element.textContent = t(message);
+    for (const [element, attribute, message] of attributeCopies) element.setAttribute(attribute, t(message));
+    for (const [element, { message, values }] of statusCopies) element.textContent = t(message, values);
+    syncControls();
+    syncLocatorCopy();
+    refreshValidity();
+  }
+
+  function storedLanguage() {
+    try {
+      return localStorage.getItem(languageKey);
+    } catch {
+      return null;
+    }
+  }
+
+  function syncDirection() {
+    const direction = fields.direction.valueAsNumber;
+    const hasBearing = Number.isFinite(direction) && direction >= 0 && direction < 360;
+    fields.directionRef.disabled = !hasBearing;
+    const reference = hasBearing && source
+      ? source.preferredRef || (direction !== source.baseline.direction ? "T" : "")
+      : "";
+    fields.directionRef.value = reference;
+    compass.update(hasBearing ? direction : null, reference, numberFormats[language].format);
+    const north = reference || source?.preferredRef;
+    compassReference.textContent = t(north === "M" ? "Magnetic north reference"
+      : north === "T" ? "True north reference"
+      : hasBearing ? "North reference unspecified"
+      : "True north by default");
+  }
+
+  function syncModelPicker() {
+    const model = fields.model.value;
+    modelPicker.value = model && !cameraPresets.has(model) ? customChoice : model;
+    customModel.hidden = modelPicker.value !== customChoice;
+  }
+
+  function syncControls() {
+    const disabled = !source || loading || exporting;
+    get("gps-fields").disabled = disabled;
+    get("capture-fields").disabled = disabled;
+    get("guide-fields").disabled = disabled;
+    compassDial.tabIndex = disabled ? -1 : 0;
+    compassDial.setAttribute("aria-disabled", String(disabled));
+    download.disabled = disabled || readingReference;
+    download.textContent = t(exporting ? "Preparing JPG…" : "Download JPG");
+    choose.disabled = exporting;
+    chooseOther.disabled = exporting;
+    syncDirection();
+  }
+
+  function photoLocation() {
+    const latitude = fields.latitude.valueAsNumber;
+    const longitude = fields.longitude.valueAsNumber;
+    if (!Number.isFinite(latitude) || Math.abs(latitude) > 90 ||
+        !Number.isFinite(longitude) || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+  }
+
+  function setField(name, value) {
+    fields[name].value = value;
+    fields[name].dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function pointText(point) {
+    return point.latitude.toFixed(7) + ", " + point.longitude.toFixed(7);
+  }
+
+  function localFileTime(timestamp) {
+    const time = new Date(timestamp);
+    if (!Number.isFinite(+time)) return "";
+    const pad = (value) => String(value).padStart(2, "0");
+    const day = [String(time.getFullYear()).padStart(4, "0"), pad(time.getMonth() + 1), pad(time.getDate())].join("-");
+    const clock = [pad(time.getHours()), pad(time.getMinutes()), pad(time.getSeconds())].join(":");
+    return day + "T" + clock;
+  }
+
+  function stopElevationLookup() {
+    if (elevationLookup) elevationLookup.abort();
+    elevationLookup = null;
+    elevationGuess = null;
+    useElevation.hidden = true;
+    showStatus(elevationStatus, "");
+  }
+
+  function refreshGuide() {
+    const point = photoLocation();
+    const key = point ? point.latitude + "," + point.longitude : "";
+    if (key !== positionKey) stopElevationLookup();
+    positionKey = key;
+    get("position-required").hidden = Boolean(point);
+    get("find-bearing").disabled = !point;
+    findElevation.disabled = !point || Boolean(elevationLookup);
+  }
+
+  function resetGuide() {
+    stopElevationLookup();
+    referenceVersion++;
+    readingReference = false;
+    showStatus(referenceStatus, "");
+    showStatus(get("file-time-status"), "");
+    get("use-file-time").disabled = !localFileTime(source.lastModified);
+    get("location-assist").hidden = false;
+    get("guide-fields").hidden = false;
+    guide.open = false;
+    refreshGuide();
+  }
+
+  function openLocator(mode) {
+    locatorMode = mode;
+    locatorOrigin = photoLocation();
+    const bearing = mode === "bearing";
+    if (bearing && !locatorOrigin) return;
+    syncLocatorCopy();
+    locationText.value = !bearing && locatorOrigin
+      ? locatorOrigin.latitude + ", " + locatorOrigin.longitude
+      : "";
+    showStatus(locatorStatus, "");
+    locator.showModal();
+    locationText.focus();
+  }
+
+  function syncLocatorCopy() {
+    const bearing = locatorMode === "bearing";
+    get("locator-heading").textContent = t(bearing ? "Find a landmark" : "Find the photo location");
+    get("locator-intro").textContent = t(bearing
+      ? "Choose a point the camera was facing. The photo location is the starting point."
+      : "Choose the spot where you stood when taking the photo.");
+    get("apply-location").textContent = t(bearing ? "Set camera direction" : "Set photo location");
+    toggleMap.textContent = t(onlineMap ? "Hide map" : "Open online map");
+  }
+
+  function hideMap() {
+    if (onlineMap) onlineMap.destroy();
+    onlineMap = null;
+    toggleMap.textContent = t("Open online map");
+    toggleMap.setAttribute("aria-expanded", "false");
+    showStatus(mapStatus, "");
+    mapRegion.hidden = true;
+  }
+
+  function toggleOnlineMap() {
+    if (onlineMap) {
+      hideMap();
+      return;
+    }
+    const point = parseLocation(locationText.value);
+    mapRegion.hidden = false;
+    toggleMap.textContent = t("Hide map");
+    toggleMap.setAttribute("aria-expanded", "true");
+    showStatus(mapStatus, "Loading online map…");
+    onlineMap = mountExifMap(get("location-map"), {
+      center: point || locatorOrigin,
+      mode: locatorMode,
+      origin: locatorMode === "bearing" ? locatorOrigin : null,
+      language,
+      onPoint(selection) {
+        locationText.value = pointText(selection);
+        updateLocatorSelection();
+      },
+      onStatus(message, error = false) {
+        showStatus(mapStatus, message, error);
+      },
+    });
+    if (point) onlineMap.setPoint(point);
+  }
+
+  function updateLocatorSelection() {
+    const point = parseLocation(locationText.value);
+    if (!point) {
+      showStatus(locatorStatus, "");
+      return;
+    }
+    if (locatorMode === "location") {
+      showStatus(locatorStatus, "Selected location {point}", false, { point: pointText(point) });
+      return;
+    }
+    const direction = initialTrueBearing(locatorOrigin, point);
+    if (direction === null) {
+      showStatus(locatorStatus, "Choose a different point to calculate a direction.", true);
+    } else {
+      showStatus(locatorStatus, "Camera direction {bearing}° true north", false,
+        { bearing: numberFormats[language].format(readableBearing(direction)) });
+    }
+  }
+
+  function readableBearing(direction) {
+    return Number(direction.toFixed(3)) % 360;
+  }
+
+  async function lookupElevation() {
+    const point = photoLocation();
+    if (!point || elevationLookup) return;
+    const controller = new AbortController();
+    elevationLookup = controller;
+    elevationGuess = null;
+    useElevation.hidden = true;
+    refreshGuide();
+    showStatus(elevationStatus, "Looking up ground elevation…");
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const url = new URL("https://api.open-elevation.com/api/v1/lookup");
+    url.searchParams.set("locations", point.latitude + "," + point.longitude);
+    url.searchParams.set("dataset", "auto");
+
+    try {
+      const response = await fetch(url, { signal: controller.signal, credentials: "omit" });
+      if (!response.ok) throw new Error("Elevation lookup is unavailable.");
+      const { results } = await response.json();
+      if (elevationLookup !== controller) return;
+      const result = results?.[0];
+      if (!result?.dataset || !Number.isFinite(result.elevation)) {
+        showStatus(elevationStatus, "No ground elevation was returned for this location.", true);
+        return;
+      }
+      elevationGuess = Math.round(result.elevation);
+      showStatus(elevationStatus, "Estimated ground elevation {elevation} m.", false, { elevation: elevationGuess });
+      useElevation.hidden = false;
+    } catch {
+      if (elevationLookup === controller) {
+        showStatus(elevationStatus, "Ground elevation is unavailable. You can enter a known altitude in metres.", true);
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (elevationLookup === controller) {
+        elevationLookup = null;
+        refreshGuide();
+      }
+    }
+  }
+
+  function fieldValue(name) {
+    const field = fields[name];
+    if (!field.value) return null;
+    if (numeric.has(name)) return field.valueAsNumber;
+    if (name === "model") return field.value.trim() || null;
+    return field.value;
+  }
+
+  function setFields(values) {
+    for (const name of editable) {
+      const field = fields[name];
+      const value = values[name];
+      field.setCustomValidity("");
+      if (numeric.has(name) && value != null) {
+        const rounded = Number(value.toFixed(9));
+        field.value = String(name === "direction" && rounded === 360 ? value : rounded);
+      } else {
+        field.value = value ?? "";
+      }
+    }
+    source.preferredRef = values.directionRef || "";
+    source.baseline = Object.fromEntries(editable.map((name) => [name, fieldValue(name)]));
+    syncDirection();
+    syncModelPicker();
+  }
+
+  function decodeImage(url) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("This photo could not be decoded. Choose another JPG or PNG."));
+      image.src = url;
+    });
+  }
+
+  function showPhoto(next, image) {
+    if (source) URL.revokeObjectURL(source.url);
+    source = next;
+    preview.src = next.url;
+    preview.hidden = false;
+    dropzone.classList.add("has-image");
+    get("empty-state").hidden = true;
+    get("source-info").hidden = false;
+    get("file-name").textContent = next.name;
+    showStatus(get("file-details"), "{format} · {width} × {height} px", false, {
+      format: next.kind === "jpeg" ? "JPG" : "PNG", width: image.naturalWidth, height: image.naturalHeight,
+    });
+
+    setFields(next.values);
+    compassTool.hidden = false;
+    compassTool.open = false;
+    resetGuide();
+    const hasValues = editable.some((name) => next.values[name] != null);
+    const status = hasValues
+      ? "Edit or add values. Clear a field to remove its EXIF value."
+      : "This photo has no saved values for these fields. You can add your own.";
+    showStatus(metadataStatus, status);
+    showStatus(editHint, next.kind === "png"
+      ? "PNG is converted to JPG. Transparent areas become white."
+      : "");
+    showStatus(photoStatus, "");
+  }
+
+  async function loadPhoto(file) {
+    if (!file || exporting) return;
+    const version = ++loadVersion;
+    let url;
+    loading = true;
+    syncControls();
+    showStatus(photoStatus, "Opening photo…");
+    showStatus(exportStatus, "");
+
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (version !== loadVersion) return;
+      const info = inspectImage(bytes);
+      const values = readExif(info.tiff);
+      const previewBlob = new Blob([bytes], { type: "image/" + info.kind });
+      url = URL.createObjectURL(previewBlob);
+      const image = await decodeImage(url);
+      if (version !== loadVersion) return;
+      showPhoto({ ...info, bytes, values, name: file.name, lastModified: file.lastModified, url }, image);
+      url = null;
+    } catch (error) {
+      if (version === loadVersion) {
+        showStatus(photoStatus, error.message || "The photo could not be opened.", true);
+      }
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+      if (version === loadVersion) {
+        loading = false;
+        syncControls();
+      }
+    }
+  }
+
+  function getChanges() {
+    const changes = {};
+    for (const name of editable) {
+      const value = fieldValue(name);
+      if (name === "directionRef" && !fields.direction.value) continue;
+      if (value !== source.baseline[name]) changes[name] = value;
+    }
+    return changes;
+  }
+
+  function refreshValidity() {
+    const messages = {
+      latitude: "Enter a valid latitude.",
+      longitude: "Enter a valid longitude.",
+      altitude: "Enter a valid altitude.",
+      direction: "Enter a direction from 0° to less than 360°.",
+      date: "Enter a valid capture date and time.",
+    };
+    for (const [name, message] of Object.entries(messages)) {
+      const field = fields[name];
+      field.setCustomValidity("");
+      if (!field.validity.valid || (name === "direction" && field.valueAsNumber >= 360)) {
+        field.setCustomValidity(t(message));
+      }
+    }
+  }
+
+  function validate() {
+    refreshValidity();
+    return form.reportValidity();
+  }
+
+  async function encodePngAsJpeg(photo) {
+    // Keep pixels in their original orientation. The copied EXIF tag will
+    // apply the display orientation to the resulting JPEG.
+    const parts = photo.exifStart == null
+      ? [photo.bytes]
+      : [photo.bytes.subarray(0, photo.exifStart), photo.bytes.subarray(photo.exifEnd)];
+    const url = URL.createObjectURL(new Blob(parts, { type: "image/png" }));
+    const canvas = document.createElement("canvas");
+    try {
+      const image = await decodeImage(url);
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) throw new Error("This browser could not convert the PNG to JPG.");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.95));
+      if (!blob || blob.type !== "image/jpeg") {
+        throw new Error("The browser could not encode this PNG as a JPG. Try a smaller image.");
+      }
+      return new Uint8Array(await blob.arrayBuffer());
+    } finally {
+      URL.revokeObjectURL(url);
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!source || loading || exporting || readingReference || !validate()) return;
+    const changes = getChanges();
+    exporting = true;
+    syncControls();
+    showStatus(exportStatus, "Preparing your JPG…");
+
+    try {
+      const hasChanges = Object.keys(changes).length > 0;
+      let output = source.bytes;
+      if (source.kind === "png") output = await encodePngAsJpeg(source);
+      if (hasChanges || source.kind === "png") {
+        const tiff = hasChanges ? writeExif(source.tiff, changes) : source.tiff;
+        output = replaceJpegExif(output, tiff);
+      }
+      const filename = source.name.replace(/\.(?:jpe?g|png)$/i, "") + "-edited.jpg";
+      downloadBlob(new Blob([output], { type: "image/jpeg" }), filename);
+      showStatus(exportStatus, "Download started.");
+    } catch (error) {
+      showStatus(exportStatus, error.message || "The JPG could not be created.", true);
+    } finally {
+      exporting = false;
+      syncControls();
+    }
+  });
+
+  form.addEventListener("input", (event) => {
+    if (event.target instanceof HTMLInputElement) event.target.setCustomValidity("");
+    if (event.target === fields.direction) {
+      syncDirection();
+    }
+    if (event.target === fields.latitude || event.target === fields.longitude) refreshGuide();
+    showStatus(exportStatus, "");
+  });
+  fields.directionRef.addEventListener("change", () => {
+    if (source) {
+      source.preferredRef = fields.directionRef.value;
+      syncDirection();
+    }
+  });
+  modelPicker.addEventListener("change", () => {
+    const selection = modelPicker.value;
+    customModel.hidden = selection !== customChoice;
+    if (selection !== customChoice) setField("model", selection);
+  });
+  get("find-location").addEventListener("click", () => openLocator("location"));
+  get("find-bearing").addEventListener("click", () => openLocator("bearing"));
+  get("close-locator").addEventListener("click", () => locator.close());
+  locator.addEventListener("close", hideMap);
+  toggleMap.addEventListener("click", toggleOnlineMap);
+  locationText.addEventListener("input", updateLocatorSelection);
+  get("location-entry").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const point = parseLocation(locationText.value);
+    if (!point) {
+      showStatus(locatorStatus, "Enter valid latitude and longitude or a full map link containing coordinates.", true);
+      locationText.focus();
+      return;
+    }
+    if (locatorMode === "location") {
+      setField("latitude", Number(point.latitude.toFixed(9)));
+      setField("longitude", Number(point.longitude.toFixed(9)));
+    } else {
+      const direction = initialTrueBearing(locatorOrigin, point);
+      if (direction === null) {
+        updateLocatorSelection();
+        return;
+      }
+      source.preferredRef = "T";
+      setField("direction", readableBearing(direction));
+    }
+    locator.close();
+  });
+  findElevation.addEventListener("click", lookupElevation);
+  useElevation.addEventListener("click", () => {
+    if (elevationGuess === null) return;
+    setField("altitude", elevationGuess);
+    showStatus(elevationStatus, "Altitude set to the estimated ground elevation.");
+    elevationGuess = null;
+    useElevation.hidden = true;
+    findElevation.focus();
+  });
+  get("use-file-time").addEventListener("click", () => {
+    const date = localFileTime(source.lastModified);
+    if (!date) return;
+    setField("date", date);
+    showStatus(get("file-time-status"), "Capture date field filled from the file’s modified time.");
+  });
+  get("choose-reference-photo").addEventListener("click", () => referencePhoto.click());
+  referencePhoto.addEventListener("change", async () => {
+    const file = referencePhoto.files[0];
+    referencePhoto.value = "";
+    if (!file || !source || loading || exporting) return;
+    const version = ++referenceVersion;
+    const previousModel = fields.model.value;
+    readingReference = true;
+    syncControls();
+    showStatus(referenceStatus, "Reading the reference photo…");
+    try {
+      const image = inspectImage(new Uint8Array(await file.arrayBuffer()));
+      const { model } = readExif(image.tiff);
+      if (version !== referenceVersion) return;
+      if (!model) {
+        showStatus(referenceStatus, "No camera model was found in that photo’s EXIF.", true);
+        return;
+      }
+      if (fields.model.value !== previousModel) {
+        showStatus(referenceStatus, "The camera model was edited while the reference photo was being read.", true);
+        return;
+      }
+      setField("model", model);
+      syncModelPicker();
+      showStatus(referenceStatus, "Camera model copied from the reference photo.");
+    } catch {
+      if (version === referenceVersion) {
+        showStatus(referenceStatus, "Could not read the reference photo. Choose another JPG or PNG.", true);
+      }
+    } finally {
+      if (version === referenceVersion) {
+        readingReference = false;
+        syncControls();
+      }
+    }
+  });
+  choose.addEventListener("click", () => picker.click());
+  chooseOther.addEventListener("click", () => picker.click());
+  picker.addEventListener("change", () => {
+    const file = picker.files[0];
+    picker.value = "";
+    loadPhoto(file);
+  });
+
+  const carriesFiles = (event) => Array.from(event.dataTransfer.types).includes("Files");
+  photoPanel.addEventListener("dragenter", (event) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dropDepth++;
+    if (!exporting) dropzone.classList.add("is-dragging");
+  });
+  photoPanel.addEventListener("dragover", (event) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = exporting ? "none" : "copy";
+  });
+  photoPanel.addEventListener("dragleave", () => {
+    dropDepth = Math.max(0, dropDepth - 1);
+    if (!dropDepth) dropzone.classList.remove("is-dragging");
+  });
+  photoPanel.addEventListener("drop", (event) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    dropDepth = 0;
+    dropzone.classList.remove("is-dragging");
+    if (exporting) return;
+    if (event.dataTransfer.files.length !== 1) {
+      showStatus(photoStatus, "Drop one JPG or PNG at a time.", true);
+      return;
+    }
+    loadPhoto(event.dataTransfer.files[0]);
+  });
+  for (const eventName of ["dragover", "drop"]) {
+    window.addEventListener(eventName, (event) => {
+      if (carriesFiles(event)) event.preventDefault();
+    });
+  }
+  for (const next of ["en", "fr"]) {
+    get("language-" + next).addEventListener("click", () => {
+      applyLanguage(next);
+      try {
+        localStorage.setItem(languageKey, next);
+      } catch {
+        // The switch remains available when the browser blocks local storage.
+      }
+    });
+  }
+  get("download-html").addEventListener("click", () => {
+    try {
+      downloadBlob(htmlDownload, "index.html");
+      showStatus(get("html-status"), "HTML download started.");
+    } catch {
+      showStatus(get("html-status"), "The HTML file could not be downloaded.", true);
+    }
+  });
+  showStatus(metadataStatus, "Choose a photo to see its saved values.");
+  applyLanguage(storedLanguage());
+})();
+  </script></body></html>
